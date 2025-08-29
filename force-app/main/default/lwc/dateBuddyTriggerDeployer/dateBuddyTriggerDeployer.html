@@ -8,10 +8,10 @@
                             options={options}
                             onchange={handleChange}>
         </lightning-combobox>
-        <div class="actions">
-            <lightning-button variant="brand" label="Deploy Trigger" onclick={deploy} disabled={isBusy || !objectApiName}></lightning-button>
-            <lightning-button class="slds-m-left_small" label="Retry Deploy" onclick={retry} disabled={isBusy || !objectApiName || !canRetry}></lightning-button>
-            <lightning-button class="slds-m-left_small" label="View Trigger Source" onclick={viewSource} disabled={isBusy || !objectApiName}></lightning-button>
+        <div class="actions slds-m-top_medium">
+            <lightning-button variant="brand" label="Deploy Trigger" onclick={deploy} disabled={isDeployDisabled}></lightning-button>
+            <lightning-button class="slds-m-left_small" label="Retry Deploy" onclick={retry} disabled={isRetryDisabled}></lightning-button>
+            <lightning-button class="slds-m-left_small" label="View Trigger Source" onclick={viewSource} disabled={isViewSourceDisabled}></lightning-button>
         </div>
         <template if:true={message}>
             <div class="msg">{message}</div>

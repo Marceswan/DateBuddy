@@ -32,6 +32,16 @@ public class MetadataService {
 	
 	public static String SOAP_M_URI = 'http://soap.sforce.com/2006/04/metadata';
     
+	/**
+	 * Creates a MetadataPort service with proper authentication
+	 */
+	public static MetadataPort createService() { 
+		MetadataPort service = new MetadataPort();
+		service.SessionHeader = new SessionHeader_element();
+		service.SessionHeader.sessionId = UserInfo.getSessionId();
+		return service;        
+	}
+    
 	public class ReportTypeColumnTranslation {
         public String label;
         public String name;

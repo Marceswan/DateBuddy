@@ -29,17 +29,71 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         this.canRetry = false;
     }
 
+    get isDeployDisabled() {
+        return this.isBusy || !this.objectApiName;
+    }
+
+    get isRetryDisabled() {
+        return this.isBusy || !this.objectApiName || !this.canRetry;
+    }
+
+    get isViewSourceDisabled() {
+        return this.isBusy || !this.objectApiName;
+    }
+
     async deploy() {
         this.isBusy = true;
         this.message = '';
         try {
-            const asyncId = await deployTrigger({ objectApiName: this.objectApiName });
-            this.message = `Deployment started. AsyncResult Id: ${asyncId}`;
-            this.startPolling(asyncId);
+            // Open VF page in a new window for JSZip-based deployment
+            const vfUrl = `/apex/DateBuddyDeploy?objectApiName=${encodeURIComponent(this.objectApiName)}`;
+            const deployWindow = window.open(vfUrl, 'deployWindow', 'width=600,height=400');
+            
+            // Poll the VF page for deployment result
+            this.message = 'Deployment window opened. Processing...';
+            
+            // Check for deployment result from VF page
+            const checkInterval = setInterval(() => {
+                try {
+                    if (deployWindow.closed) {
+                        clearInterval(checkInterval);
+                        this.message = 'Deployment window closed';
+                        this.canRetry = true;
+                        this.isBusy = false;
+                    } else if (deployWindow.deploymentResult) {
+                        clearInterval(checkInterval);
+                        const result = deployWindow.deploymentResult;
+                        if (result.success) {
+                            this.message = `Deployment started. AsyncResult Id: ${result.asyncResultId}`;
+                            this.startPolling(result.asyncResultId);
+                        } else {
+                            this.message = result.error || 'Deployment failed';
+                            this.canRetry = true;
+                        }
+                        deployWindow.close();
+                        this.isBusy = false;
+                    }
+                } catch (e) {
+                    // Cross-origin error is expected, continue polling
+                }
+            }, 1000);
+            
+            // Timeout after 30 seconds
+            setTimeout(() => {
+                clearInterval(checkInterval);
+                if (!deployWindow.closed) {
+                    deployWindow.close();
+                }
+                if (this.isBusy) {
+                    this.message = 'Deployment timed out';
+                    this.canRetry = true;
+                    this.isBusy = false;
+                }
+            }, 30000);
+            
         } catch (e) {
             this.message = e?.body?.message || e?.message || 'Deployment failed';
             this.canRetry = true;
-        } finally {
             this.isBusy = false;
         }
     }

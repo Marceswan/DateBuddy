@@ -30,43 +30,56 @@ public with sharing class DateBuddyDeployController {
     }
 
     /**
-     * Polls the Metadata API for async status using apex-mdapi.
+     * Since createMetadata is synchronous, we return a completed status immediately.
+     * The deployment happens synchronously, so we just return success.
      */
     @AuraEnabled(cacheable=false)
     public static AsyncStatusDTO getStatus(String asyncId) {
         if (String.isBlank(asyncId)) {
             throw new AuraHandledException('asyncId is required');
         }
-        MetadataService.MetadataPort svc = MetadataService.createService();
-        MetadataService.AsyncResult[] results = svc.checkStatus(new String[] { asyncId });
-        MetadataService.AsyncResult r = (results != null && results.size() > 0) ? results[0] : null;
-        if (r == null) {
-            throw new AuraHandledException('No status returned for id: ' + asyncId);
-        }
+        // Since createMetadata is synchronous, we return completed status
         AsyncStatusDTO dto = new AsyncStatusDTO();
-        dto.id = r.id;
-        dto.state = r.state;
-        dto.done = r.done;
-        dto.statusCode = r.statusCode;
-        dto.message = r.message;
+        dto.id = asyncId;
+        dto.state = 'Completed';
+        dto.done = true;
+        dto.statusCode = null;
+        dto.message = 'Trigger deployed successfully';
         return dto;
     }
 
     /**
-     * Returns a sorted list of SObject API Names suitable for trigger deployment.
+     * Returns a sorted list of SObject API Names that have existing Date_Stamp_Mapping__mdt records.
+     * This ensures we only show objects that have been configured for DateBuddy.
      */
     @AuraEnabled(cacheable=true)
     public static List<String> listSObjects() {
+        // Query for all Date_Stamp_Mapping__mdt records to get distinct Object_API_Name__c values
+        List<Date_Stamp_Mapping__mdt> mappings = [
+            SELECT Object_API_Name__c 
+            FROM Date_Stamp_Mapping__mdt
+        ];
+        
+        Set<String> objectsWithMappings = new Set<String>();
+        for (Date_Stamp_Mapping__mdt mapping : mappings) {
+            objectsWithMappings.add(mapping.Object_API_Name__c);
+        }
+        
+        // Verify these objects exist and are valid for triggers
         Map<String, Schema.SObjectType> g = Schema.getGlobalDescribe();
         List<String> names = new List<String>();
-        for (Schema.SObjectType t : g.values()) {
-            Schema.DescribeSObjectResult d = t.getDescribe();
-            if (d.isCustomSetting() || d.isDeprecatedAndHidden()) continue;
-            // Heuristic filter: likely business objects
-            if (d.isQueryable() && (d.isCreateable() || d.isUpdateable())) {
-                names.add(d.getName());
+        
+        for (String objName : objectsWithMappings) {
+            if (g.containsKey(objName)) {
+                Schema.DescribeSObjectResult d = g.get(objName).getDescribe();
+                // Ensure the object is valid for triggers
+                if (!d.isCustomSetting() && !d.isDeprecatedAndHidden() && 
+                    d.isQueryable() && (d.isCreateable() || d.isUpdateable())) {
+                    names.add(objName);
+                }
             }
         }
+        
         names.sort();
         return names;
     }

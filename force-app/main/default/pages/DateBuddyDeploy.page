@@ -1,0 +1,168 @@
+<apex:page controller="DateStampTriggerDeployer" showHeader="false" sidebar="false" standardStylesheets="false">
+    <apex:includeScript value="{!$Resource.jsziplib}"/>
+    
+    <script>
+        // Global variable to store deployment result
+        window.deploymentResult = null;
+        
+        function createTriggerZip(objectApiName, triggerName, triggerSource) {
+            try {
+                var zip = new JSZip();
+                
+                // Create package.xml
+                var packageXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                    '<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
+                    '    <types>\n' +
+                    '        <members>' + triggerName + '</members>\n' +
+                    '        <name>ApexTrigger</name>\n' +
+                    '    </types>\n' +
+                    '    <version>62.0</version>\n' +
+                    '</Package>';
+                
+                // Create trigger meta.xml
+                var triggerMetaXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                    '<ApexTrigger xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
+                    '    <apiVersion>62.0</apiVersion>\n' +
+                    '    <status>Active</status>\n' +
+                    '</ApexTrigger>';
+                
+                // Add files to ZIP
+                zip.file("package.xml", packageXml);
+                zip.folder("triggers").file(triggerName + ".trigger", triggerSource);
+                zip.folder("triggers").file(triggerName + ".trigger-meta.xml", triggerMetaXml);
+                
+                // Generate base64 ZIP
+                return zip.generateAsync({type: "base64"})
+                    .then(function(base64) {
+                        return deployTriggerZip(base64);
+                    });
+            } catch(e) {
+                console.error('Error creating ZIP:', e);
+                window.deploymentResult = {
+                    success: false,
+                    error: e.message || 'Failed to create ZIP file'
+                };
+                return Promise.reject(e);
+            }
+        }
+        
+        function deployTriggerZip(base64Zip) {
+            return new Promise(function(resolve, reject) {
+                Visualforce.remoting.Manager.invokeAction(
+                    '{!$RemoteAction.DateStampTriggerDeployer.deployZip}',
+                    base64Zip,
+                    function(result, event) {
+                        if (event.status) {
+                            window.deploymentResult = {
+                                success: true,
+                                asyncResultId: result
+                            };
+                            resolve(result);
+                        } else {
+                            window.deploymentResult = {
+                                success: false,
+                                error: event.message || 'Deployment failed'
+                            };
+                            reject(new Error(event.message));
+                        }
+                    },
+                    {escape: false, timeout: 120000}
+                );
+            });
+        }
+        
+        // Function to be called from LWC or external context
+        window.deployTrigger = function(objectApiName) {
+            return new Promise(function(resolve, reject) {
+                // Get trigger details from controller
+                Visualforce.remoting.Manager.invokeAction(
+                    '{!$RemoteAction.DateStampTriggerDeployer.getTriggerDetails}',
+                    objectApiName,
+                    function(result, event) {
+                        if (event.status && result) {
+                            createTriggerZip(objectApiName, result.triggerName, result.triggerSource)
+                                .then(function(asyncResultId) {
+                                    resolve(asyncResultId);
+                                })
+                                .catch(function(error) {
+                                    reject(error);
+                                });
+                        } else {
+                            window.deploymentResult = {
+                                success: false,
+                                error: event.message || 'Failed to get trigger details'
+                            };
+                            reject(new Error(event.message || 'Failed to get trigger details'));
+                        }
+                    },
+                    {escape: false}
+                );
+            });
+        };
+        
+        // Function to check deployment status
+        window.checkDeploymentStatus = function(asyncResultId) {
+            return new Promise(function(resolve, reject) {
+                Visualforce.remoting.Manager.invokeAction(
+                    '{!$RemoteAction.DateStampTriggerDeployer.checkDeploymentStatus}',
+                    asyncResultId,
+                    function(result, event) {
+                        if (event.status) {
+                            resolve(result);
+                        } else {
+                            reject(new Error(event.message || 'Failed to check status'));
+                        }
+                    },
+                    {escape: false}
+                );
+            });
+        };
+    </script>
+    
+    <div id="status" style="padding: 20px; font-family: Arial, sans-serif;">
+        <h2>DateBuddy Trigger Deployment</h2>
+        <div id="message">Initializing...</div>
+    </div>
+    
+    <script>
+        // Auto-deploy if objectApiName is provided in URL
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const objectApiName = urlParams.get('objectApiName');
+            
+            if (objectApiName) {
+                document.getElementById('message').innerHTML = 'Deploying trigger for: ' + objectApiName;
+                
+                window.deployTrigger(objectApiName)
+                    .then(function(asyncResultId) {
+                        document.getElementById('message').innerHTML = 
+                            'Deployment successful!<br/>AsyncResult ID: ' + asyncResultId;
+                        
+                        // Set result for parent window
+                        window.deploymentResult = {
+                            success: true,
+                            asyncResultId: asyncResultId
+                        };
+                        
+                        // Auto-close after 2 seconds
+                        setTimeout(function() {
+                            window.close();
+                        }, 2000);
+                    })
+                    .catch(function(error) {
+                        document.getElementById('message').innerHTML = 
+                            'Deployment failed: ' + error.message;
+                        
+                        // Set error result for parent window
+                        window.deploymentResult = {
+                            success: false,
+                            error: error.message
+                        };
+                    });
+            } else {
+                document.getElementById('message').innerHTML = 
+                    'No object specified. Add ?objectApiName=YourObject to the URL.';
+            }
+        };
+    </script>
+</apex:page>

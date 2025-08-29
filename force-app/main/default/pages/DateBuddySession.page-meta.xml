@@ -1,6 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ApexPage xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>60.0</apiVersion>
-    <label>DateBuddy Session</label>
     <availableInTouch>false</availableInTouch>
+    <confirmationTokenRequired>false</confirmationTokenRequired>
+    <label>DateBuddy Session</label>
+    <packageVersions>
+        <majorNumber>2</majorNumber>
+        <minorNumber>10</minorNumber>
+        <namespace>LWCCaseTimer</namespace>
+    </packageVersions>
+    <packageVersions>
+        <majorNumber>1</majorNumber>
+        <minorNumber>27</minorNumber>
+        <namespace>aptk_styler</namespace>
+    </packageVersions>
+    <packageVersions>
+        <majorNumber>6</majorNumber>
+        <minorNumber>1</minorNumber>
+        <namespace>avcmpbuilder</namespace>
+    </packageVersions>
+    <packageVersions>
+        <majorNumber>1</majorNumber>
+        <minorNumber>8</minorNumber>
+        <namespace>kanbanDev</namespace>
+    </packageVersions>
+    <packageVersions>
+        <majorNumber>1</majorNumber>
+        <minorNumber>10</minorNumber>
+        <namespace>listedit</namespace>
+    </packageVersions>
+    <packageVersions>
+        <majorNumber>1</majorNumber>
+        <minorNumber>1</minorNumber>
+        <namespace>orgtrusthealth</namespace>
+    </packageVersions>
 </ApexPage>

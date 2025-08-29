@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fields>
+        <fullName>Date_Field_API_Name__c</fullName>
+        <externalId>false</externalId>
+        <fieldManageability>DeveloperControlled</fieldManageability>
+        <label>Date Field API Name</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Direction__c</fullName>
+        <fieldManageability>DeveloperControlled</fieldManageability>
+        <label>Direction</label>
+        <required>false</required>
+        <type>Picklist</type>
+        <valueSet>
+            <restricted>true</restricted>
+            <valueSetDefinition>
+                <sorted>false</sorted>
+                <value>
+                    <fullName>Entered</fullName>
+                    <default>true</default>
+                    <label>Entered</label>
+                </value>
+                <value>
+                    <fullName>Exited</fullName>
+                    <default>false</default>
+                    <label>Exited</label>
+                </value>
+            </valueSetDefinition>
+        </valueSet>
+    </fields>
+    <fields>
+        <fullName>Object_API_Name__c</fullName>
+        <externalId>false</externalId>
+        <fieldManageability>DeveloperControlled</fieldManageability>
+        <label>Object API Name</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Picklist_API_Name__c</fullName>
+        <externalId>false</externalId>
+        <fieldManageability>DeveloperControlled</fieldManageability>
+        <label>Picklist API Name</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <fields>
+        <fullName>Picklist_Value__c</fullName>
+        <externalId>false</externalId>
+        <fieldManageability>DeveloperControlled</fieldManageability>
+        <label>Picklist Value</label>
+        <length>255</length>
+        <required>false</required>
+        <type>Text</type>
+        <unique>false</unique>
+    </fields>
+    <label>Date Stamp Mapping</label>
+    <listViews>
+        <fullName>All_Contact</fullName>
+        <columns>MasterLabel</columns>
+        <columns>Date_Field_API_Name__c</columns>
+        <columns>Picklist_Value__c</columns>
+        <columns>Direction__c</columns>
+        <columns>Picklist_API_Name__c</columns>
+        <filterScope>Everything</filterScope>
+        <filters>
+            <field>Object_API_Name__c</field>
+            <operation>equals</operation>
+            <value>Contact</value>
+        </filters>
+        <label>All Contact</label>
+        <language>en_US</language>
+    </listViews>
+    <listViews>
+        <fullName>All_Opportunity</fullName>
+        <columns>MasterLabel</columns>
+        <columns>Date_Field_API_Name__c</columns>
+        <columns>Picklist_Value__c</columns>
+        <columns>Direction__c</columns>
+        <columns>Picklist_API_Name__c</columns>
+        <filterScope>Everything</filterScope>
+        <filters>
+            <field>Object_API_Name__c</field>
+            <operation>equals</operation>
+            <value>Opportunity</value>
+        </filters>
+        <label>All Opportunity</label>
+        <language>en_US</language>
+    </listViews>
+    <pluralLabel>Date Stamp Mappings</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

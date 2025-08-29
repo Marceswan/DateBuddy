@@ -11,3 +11,15 @@ coverage/
 *.iml
 **/package-lock.json
 **/yarn.lock
+
+# Added by Illuminated Cloud
+/.illuminatedCloud/
+**/*.ts
+**/tsconfig*.json
+**/*.tsbuildinfo
+**/eslint.config.mjs
+
+# Custom Metadata Records - Reference Only (DO NOT DEPLOY)
+**/customMetadata/*.md
+**/customMetadata/*.md-meta.xml
+**/customMetadata/Date_Stamp_Mapping.*.md*
