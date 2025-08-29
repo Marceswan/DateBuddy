@@ -12,7 +12,7 @@
 ## Build, Test, and Development Commands
 - `sf deploy metadata -o <alias> --metadata ApexClass,ApexTrigger`: Deploy classes/triggers.
 - `sf apex test run -o <alias> --result-format human`: Run Apex tests.
-- `sf apex run -o <alias> --file scripts/anon.apex`: Run Anonymous Apex (e.g., to deploy triggers).
+- `sf apex run -o <alias> --file scripts/deployTrigger.apex`: Run Anonymous Apex to deploy a trigger for the specified object.
 - Alternative (legacy): replace `sf` with `sfdx` equivalents if preferred.
  - To use the LWC, add it to a Lightning page. apex-mdapi (`MetadataService.cls`) is vendored in this repo.
  - Configure ONLY a Remote Site Setting to your org base URL (e.g., `https://your-domain.my.salesforce.com`). Do not use Named Credentials.
@@ -42,8 +42,10 @@
 - If `MetadataService` (apex-mdapi) isn’t in the org, install it before deploying triggers. Also ensure the VF page `/apex/DateBuddySession` exists for session bridging as per apex-mdapi examples.
 
 ## LWC Enhancements
-- Status poller: LWC automatically polls `getStatus(asyncId)` for `AsyncResult.state` until `done=true` or timeout (~30s).
+- Status poller: LWC automatically polls `getStatus(asyncId)` for `AsyncResult.state` until `done=true` or timeout (~30s), with toast confirmations.
 - Object picker: LWC loads SObject API names from `DateBuddyDeployController.listSObjects()` into a `lightning-combobox`.
+- View source: After success, displays the deployed trigger source using the deployer’s generator; button available to fetch on demand.
+- Retry: If deployment errors or times out, a `Retry Deploy` button becomes available.
 
 ## Vendoring apex-mdapi
 - `MetadataService.cls` is included from certinia/apex-mdapi. Keep it updated as needed.

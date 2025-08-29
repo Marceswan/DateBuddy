@@ -10,9 +10,14 @@
         </lightning-combobox>
         <div class="actions">
             <lightning-button variant="brand" label="Deploy Trigger" onclick={deploy} disabled={isBusy || !objectApiName}></lightning-button>
+            <lightning-button class="slds-m-left_small" label="Retry Deploy" onclick={retry} disabled={isBusy || !objectApiName || !canRetry}></lightning-button>
+            <lightning-button class="slds-m-left_small" label="View Trigger Source" onclick={viewSource} disabled={isBusy || !objectApiName}></lightning-button>
         </div>
         <template if:true={message}>
             <div class="msg">{message}</div>
+        </template>
+        <template if:true={source}>
+            <lightning-textarea label="Deployed Trigger Source" value={source} readonly rows="12"></lightning-textarea>
         </template>
     </div>
 </template>

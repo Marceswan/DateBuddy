@@ -3,12 +3,15 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import deployTrigger from '@salesforce/apex/DateBuddyDeployController.deployTrigger';
 import getStatus from '@salesforce/apex/DateBuddyDeployController.getStatus';
 import listSObjects from '@salesforce/apex/DateBuddyDeployController.listSObjects';
+import getTriggerSource from '@salesforce/apex/DateBuddyDeployController.getTriggerSource';
 
 export default class DateBuddyTriggerDeployer extends LightningElement {
     @track objectApiName = '';
     @track isBusy = false;
     @track message = '';
     @track options = [];
+    @track source = '';
+    @track canRetry = false;
     pollTimer;
 
     async connectedCallback() {
@@ -22,6 +25,8 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
 
     handleChange(event) {
         this.objectApiName = event.detail.value;
+        this.source = '';
+        this.canRetry = false;
     }
 
     async deploy() {
@@ -33,6 +38,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
             this.startPolling(asyncId);
         } catch (e) {
             this.message = e?.body?.message || e?.message || 'Deployment failed';
+            this.canRetry = true;
         } finally {
             this.isBusy = false;
         }
@@ -58,6 +64,18 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
                                 variant: isSuccess ? 'success' : 'error'
                             })
                         );
+                        this.canRetry = !isSuccess;
+                        if (isSuccess) {
+                            try {
+                                this.source = await getTriggerSource({ objectApiName: this.objectApiName });
+                            } catch (e) {
+                                this.dispatchEvent(new ShowToastEvent({
+                                    title: 'Source Load Failed',
+                                    message: e?.body?.message || e?.message || 'Could not load trigger source',
+                                    variant: 'warning'
+                                }));
+                            }
+                        }
                     } else if (attempts >= maxAttempts) {
                         this.dispatchEvent(
                             new ShowToastEvent({
@@ -66,6 +84,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
                                 variant: 'warning'
                             })
                         );
+                        this.canRetry = true;
                     }
                     this.clearPoll();
                 }
@@ -78,6 +97,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
                         variant: 'error'
                     })
                 );
+                this.canRetry = true;
                 this.clearPoll();
             }
         }, intervalMs);
@@ -87,6 +107,28 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
             this.pollTimer = undefined;
+        }
+    }
+
+    async retry() {
+        if (!this.objectApiName || this.isBusy) return;
+        this.message = '';
+        this.source = '';
+        this.canRetry = false;
+        await this.deploy();
+    }
+
+    async viewSource() {
+        if (!this.objectApiName) return;
+        if (this.source) return; // already loaded
+        try {
+            this.source = await getTriggerSource({ objectApiName: this.objectApiName });
+        } catch (e) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Source Load Failed',
+                message: e?.body?.message || e?.message || 'Could not load trigger source',
+                variant: 'warning'
+            }));
         }
     }
 }

@@ -70,4 +70,17 @@ public with sharing class DateBuddyDeployController {
         names.sort();
         return names;
     }
+
+    /**
+     * Returns the generated trigger source for inspection in the UI.
+     * This mirrors the deployed content.
+     */
+    @AuraEnabled(cacheable=true)
+    public static String getTriggerSource(String objectApiName) {
+        if (String.isBlank(objectApiName)) {
+            throw new AuraHandledException('objectApiName is required');
+        }
+        String triggerName = DateStampTriggerDeployer.generateTriggerName(objectApiName);
+        return DateStampTriggerDeployer.generateTriggerSource(objectApiName, triggerName);
+    }
 }
