@@ -14,18 +14,22 @@ public with sharing class DateBuddyDeployController {
      * Wrapper class for object card information.
      */
     public class ObjectCardWrapper {
-        @AuraEnabled public String objectApiName;
-        @AuraEnabled public String objectLabel;
-        @AuraEnabled public Integer uniqueFieldsCount;
-        @AuraEnabled public Integer totalMappingsCount;
-        @AuraEnabled public Boolean hasDeployedTrigger;
+        @AuraEnabled public String objectName;
+        @AuraEnabled public Integer totalMappings;
+        @AuraEnabled public Integer entryMappings;
+        @AuraEnabled public Integer exitMappings;
+        @AuraEnabled public Integer fieldCount;
+        
+        public ObjectCardWrapper() {
+            // Default constructor for test instantiation
+        }
 
-        public ObjectCardWrapper(String objectApiName, String objectLabel, Integer uniqueFieldsCount, Integer totalMappingsCount, Boolean hasDeployedTrigger) {
-            this.objectApiName = objectApiName;
-            this.objectLabel = objectLabel;
-            this.uniqueFieldsCount = uniqueFieldsCount;
-            this.totalMappingsCount = totalMappingsCount;
-            this.hasDeployedTrigger = hasDeployedTrigger;
+        public ObjectCardWrapper(String objectName, Integer totalMappings, Integer entryMappings, Integer exitMappings, Integer fieldCount) {
+            this.objectName = objectName;
+            this.totalMappings = totalMappings;
+            this.entryMappings = entryMappings;
+            this.exitMappings = exitMappings;
+            this.fieldCount = fieldCount;
         }
     }
 
@@ -33,11 +37,19 @@ public with sharing class DateBuddyDeployController {
      * Wrapper class for field mapping information.
      */
     public class FieldMappingWrapper {
-        @AuraEnabled public List<TreeNode> treeData;
+        @AuraEnabled public String objectName;
+        @AuraEnabled public List<TreeNode> treeNodes;
         @AuraEnabled public List<MappingDetail> mappingDetails;
+        
+        public FieldMappingWrapper() {
+            // Default constructor for test instantiation
+            this.treeNodes = new List<TreeNode>();
+            this.mappingDetails = new List<MappingDetail>();
+        }
 
-        public FieldMappingWrapper(List<TreeNode> treeData, List<MappingDetail> mappingDetails) {
-            this.treeData = treeData;
+        public FieldMappingWrapper(String objectName, List<TreeNode> treeNodes, List<MappingDetail> mappingDetails) {
+            this.objectName = objectName;
+            this.treeNodes = treeNodes;
             this.mappingDetails = mappingDetails;
         }
     }
@@ -50,6 +62,11 @@ public with sharing class DateBuddyDeployController {
         @AuraEnabled public String name;
         @AuraEnabled public Boolean expanded;
         @AuraEnabled public List<TreeNode> items;
+        
+        public TreeNode() {
+            // Default constructor for test instantiation
+            this.items = new List<TreeNode>();
+        }
 
         public TreeNode(String label, String name, Boolean expanded) {
             this.label = label;
@@ -66,24 +83,19 @@ public with sharing class DateBuddyDeployController {
         @AuraEnabled public String id;
         @AuraEnabled public String picklistField;
         @AuraEnabled public String picklistValue;
-        @AuraEnabled public String entryDateField;
-        @AuraEnabled public String exitDateField;
+        @AuraEnabled public String dateField;
         @AuraEnabled public String direction;
+        
+        public MappingDetail() {
+            // Default constructor for test instantiation
+        }
 
         public MappingDetail(String id, String picklistField, String picklistValue, String dateField, String direction) {
             this.id = id;
             this.picklistField = picklistField;
             this.picklistValue = picklistValue;
+            this.dateField = dateField;
             this.direction = direction;
-            
-            // Set entry or exit date field based on direction
-            if (direction == 'Entered') {
-                this.entryDateField = dateField;
-                this.exitDateField = null;
-            } else if (direction == 'Exited') {
-                this.exitDateField = dateField;
-                this.entryDateField = null;
-            }
         }
     }
 
@@ -98,7 +110,8 @@ public with sharing class DateBuddyDeployController {
             
             // Since metadata queries have limitations with aggregation, process manually
             List<Date_Stamp_Mapping__mdt> allMappings = [
-                SELECT Object_API_Name__c, Picklist_API_Name__c
+                SELECT Object_API_Name__c, Picklist_API_Name__c, Date_Field_API_Name__c, 
+                       Exit_Date_Field_API_Name__c, Direction__c
                 FROM Date_Stamp_Mapping__mdt
                 WHERE Object_API_Name__c != null
             ];
@@ -106,6 +119,8 @@ public with sharing class DateBuddyDeployController {
             // Build aggregation maps manually
             Map<String, Set<String>> objectToUniqueFields = new Map<String, Set<String>>();
             Map<String, Integer> objectToTotalCount = new Map<String, Integer>();
+            Map<String, Integer> objectToEntryCount = new Map<String, Integer>();
+            Map<String, Integer> objectToExitCount = new Map<String, Integer>();
             
             for (Date_Stamp_Mapping__mdt mapping : allMappings) {
                 String objName = mapping.Object_API_Name__c;
@@ -119,8 +134,36 @@ public with sharing class DateBuddyDeployController {
                 // Track total count
                 if (!objectToTotalCount.containsKey(objName)) {
                     objectToTotalCount.put(objName, 0);
+                    objectToEntryCount.put(objName, 0);
+                    objectToExitCount.put(objName, 0);
                 }
                 objectToTotalCount.put(objName, objectToTotalCount.get(objName) + 1);
+                
+                // Determine direction based on fields populated and Direction__c value
+                // Logic:
+                // 1. If both Entry and Exit fields are populated, count as 1 entry AND 1 exit
+                // 2. If Direction__c is populated, use it
+                // 3. If only Exit_Date_Field_API_Name__c is populated (not Date_Field_API_Name__c), it's Exit
+                // 4. Otherwise default to Entry
+                String direction = mapping.Direction__c;
+                Boolean hasEntryField = String.isNotBlank(mapping.Date_Field_API_Name__c);
+                Boolean hasExitField = String.isNotBlank(mapping.Exit_Date_Field_API_Name__c);
+                
+                if (hasEntryField && hasExitField) {
+                    // Both fields populated - count as both entry and exit
+                    objectToEntryCount.put(objName, objectToEntryCount.get(objName) + 1);
+                    objectToExitCount.put(objName, objectToExitCount.get(objName) + 1);
+                    objectToTotalCount.put(objName, objectToTotalCount.get(objName) + 1); // Add extra for the dual count
+                } else if (direction != null && direction.equalsIgnoreCase('Exited')) {
+                    // Explicit Exit direction
+                    objectToExitCount.put(objName, objectToExitCount.get(objName) + 1);
+                } else if (!hasEntryField && hasExitField && String.isBlank(direction)) {
+                    // Only Exit field populated, no direction specified - treat as Exit
+                    objectToExitCount.put(objName, objectToExitCount.get(objName) + 1);
+                } else {
+                    // Default to Entry (includes when Direction__c = 'Entered' or when Date_Field_API_Name__c is populated)
+                    objectToEntryCount.put(objName, objectToEntryCount.get(objName) + 1);
+                }
             }
             
             // Get global describe for object labels and validation
@@ -142,17 +185,17 @@ public with sharing class DateBuddyDeployController {
                     continue;
                 }
                 
-                String objectLabel = describe.getLabel();
-                Integer uniqueFieldsCount = objectToUniqueFields.get(objectApiName).size();
-                Integer totalMappingsCount = objectToTotalCount.get(objectApiName);
-                Boolean hasDeployedTrigger = checkForExistingTrigger(objectApiName);
+                Integer fieldCount = objectToUniqueFields.get(objectApiName).size();
+                Integer totalMappings = objectToTotalCount.get(objectApiName);
+                Integer entryMappings = objectToEntryCount.get(objectApiName);
+                Integer exitMappings = objectToExitCount.get(objectApiName);
                 
                 results.add(new ObjectCardWrapper(
                     objectApiName, 
-                    objectLabel, 
-                    uniqueFieldsCount, 
-                    totalMappingsCount, 
-                    hasDeployedTrigger
+                    totalMappings, 
+                    entryMappings, 
+                    exitMappings, 
+                    fieldCount
                 ));
             }
             
@@ -170,20 +213,24 @@ public with sharing class DateBuddyDeployController {
     public static FieldMappingWrapper getObjectFieldMappings(String objectApiName) {
         try {
             if (String.isBlank(objectApiName)) {
-                throw new AuraHandledException('objectApiName is required');
+                FieldMappingWrapper wrapper = new FieldMappingWrapper();
+                wrapper.objectName = objectApiName;
+                return wrapper;
             }
             
             // Query all mappings for the specified object
             List<Date_Stamp_Mapping__mdt> mappings = [
                 SELECT Id, MasterLabel, Object_API_Name__c, Picklist_API_Name__c, 
-                       Picklist_Value__c, Date_Field_API_Name__c
+                       Picklist_Value__c, Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c
                 FROM Date_Stamp_Mapping__mdt 
                 WHERE Object_API_Name__c = :objectApiName
                 ORDER BY Picklist_API_Name__c, Picklist_Value__c, Date_Field_API_Name__c
             ];
             
             if (mappings.isEmpty()) {
-                return new FieldMappingWrapper(new List<TreeNode>(), new List<MappingDetail>());
+                FieldMappingWrapper wrapper = new FieldMappingWrapper();
+                wrapper.objectName = objectApiName;
+                return wrapper;
             }
             
             // Build tree structure and flat list
@@ -194,44 +241,94 @@ public with sharing class DateBuddyDeployController {
                 String picklistField = mapping.Picklist_API_Name__c;
                 String picklistValue = mapping.Picklist_Value__c;
                 String dateField = mapping.Date_Field_API_Name__c;
+                String exitDateField = mapping.Exit_Date_Field_API_Name__c;
+                String directionValue = mapping.Direction__c;
                 
-                // Determine direction from field name pattern
-                String direction = 'Entered'; // default
-                if (dateField != null) {
-                    if (dateField.toLowerCase().contains('exited') || dateField.toLowerCase().contains('exit')) {
-                        direction = 'Exited';
-                    }
-                }
+                Boolean hasEntryField = String.isNotBlank(dateField);
+                Boolean hasExitField = String.isNotBlank(exitDateField);
                 
                 // Create or get picklist field node
                 if (!picklistNodes.containsKey(picklistField)) {
                     picklistNodes.put(picklistField, new TreeNode(picklistField, picklistField, true));
                 }
-                
                 TreeNode picklistNode = picklistNodes.get(picklistField);
                 
-                // Create value node
-                String valueNodeName = picklistField + '_' + picklistValue + '_' + direction;
-                TreeNode valueNode = new TreeNode(
-                    picklistValue + ' (' + direction + ')',
-                    valueNodeName,
-                    false
-                );
-                picklistNode.items.add(valueNode);
-                
-                // Add to flat mapping details
-                mappingDetails.add(new MappingDetail(
-                    mapping.Id,
-                    picklistField,
-                    picklistValue,
-                    dateField,
-                    direction
-                ));
+                // If both entry and exit fields are populated, create two separate entries
+                if (hasEntryField && hasExitField) {
+                    // Create Entry node
+                    String entryNodeName = picklistField + '_' + picklistValue + '_Entered';
+                    TreeNode entryNode = new TreeNode(
+                        picklistValue + ' (Entered)',
+                        entryNodeName,
+                        false
+                    );
+                    picklistNode.items.add(entryNode);
+                    
+                    // Add Entry to flat mapping details
+                    mappingDetails.add(new MappingDetail(
+                        mapping.Id + '_entry',
+                        picklistField,
+                        picklistValue,
+                        dateField,
+                        'Entered'
+                    ));
+                    
+                    // Create Exit node
+                    String exitNodeName = picklistField + '_' + picklistValue + '_Exited';
+                    TreeNode exitNode = new TreeNode(
+                        picklistValue + ' (Exited)',
+                        exitNodeName,
+                        false
+                    );
+                    picklistNode.items.add(exitNode);
+                    
+                    // Add Exit to flat mapping details
+                    mappingDetails.add(new MappingDetail(
+                        mapping.Id + '_exit',
+                        picklistField,
+                        picklistValue,
+                        exitDateField,
+                        'Exited'
+                    ));
+                } else {
+                    // Single entry based on which field is populated and Direction__c
+                    String direction;
+                    String displayDateField;
+                    
+                    if (directionValue != null && directionValue.equalsIgnoreCase('Exited')) {
+                        direction = 'Exited';
+                        displayDateField = hasExitField ? exitDateField : dateField;
+                    } else if (!hasEntryField && hasExitField && String.isBlank(directionValue)) {
+                        direction = 'Exited';
+                        displayDateField = exitDateField;
+                    } else {
+                        direction = 'Entered';
+                        displayDateField = dateField;
+                    }
+                    
+                    // Create value node
+                    String valueNodeName = picklistField + '_' + picklistValue + '_' + direction;
+                    TreeNode valueNode = new TreeNode(
+                        picklistValue + ' (' + direction + ')',
+                        valueNodeName,
+                        false
+                    );
+                    picklistNode.items.add(valueNode);
+                    
+                    // Add to flat mapping details
+                    mappingDetails.add(new MappingDetail(
+                        mapping.Id,
+                        picklistField,
+                        picklistValue,
+                        displayDateField,
+                        direction
+                    ));
+                }
             }
             
-            List<TreeNode> treeData = picklistNodes.values();
+            List<TreeNode> treeNodes = picklistNodes.values();
             
-            return new FieldMappingWrapper(treeData, mappingDetails);
+            return new FieldMappingWrapper(objectApiName, treeNodes, mappingDetails);
             
         } catch (Exception e) {
             throw new AuraHandledException('Failed to retrieve field mappings for ' + objectApiName + ': ' + e.getMessage());
@@ -277,18 +374,9 @@ public with sharing class DateBuddyDeployController {
         if (String.isBlank(objectApiName)) {
             throw new AuraHandledException('objectApiName is required');
         }
-        // For now, return a placeholder result since DateStampTriggerDeployer may not be available
-        MetadataService.AsyncResult result = new MetadataService.AsyncResult();
-        result.done = false;
-        result.id = 'PENDING_' + System.now().getTime();
-        result.state = 'Pending';
-        result.message = 'Trigger deployment initiated for ' + objectApiName;
-        
-        MetadataService.AsyncResult[] results = new MetadataService.AsyncResult[] { result };
-        if (results == null || results.isEmpty()) {
-            throw new AuraHandledException('No async result returned from Metadata API');
-        }
-        return results[0].id;
+        // Return a placeholder result for deployment tracking
+        String deploymentId = 'PENDING_' + System.now().getTime();
+        return deploymentId;
     }
 
     /**
@@ -369,5 +457,130 @@ public with sharing class DateBuddyDeployController {
                '    // Generated trigger for ' + objectApiName + '\n' +
                '    // This is a placeholder - actual implementation would be generated by DateStampTriggerDeployer\n' +
                '}';
+    }
+    
+    /**
+     * Returns picklist fields for a given object.
+     * Used by the UI to display available picklist fields.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, String>> getObjectPicklistFields(String objectApiName) {
+        List<Map<String, String>> fields = new List<Map<String, String>>();
+        
+        if (String.isBlank(objectApiName)) {
+            return fields;
+        }
+        
+        // Get object describe
+        Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+        if (sObjectType == null) {
+            return fields;
+        }
+        
+        Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+        
+        for (String fieldName : fieldMap.keySet()) {
+            Schema.DescribeFieldResult fieldDescribe = fieldMap.get(fieldName).getDescribe();
+            
+            if (fieldDescribe.getType() == Schema.DisplayType.PICKLIST ||
+                fieldDescribe.getType() == Schema.DisplayType.MULTIPICKLIST) {
+                Map<String, String> field = new Map<String, String>();
+                field.put('label', fieldDescribe.getLabel());
+                field.put('value', fieldDescribe.getName());
+                fields.add(field);
+            }
+        }
+        
+        return fields;
+    }
+    
+    /**
+     * Returns picklist values for a given field.
+     * Used by the UI to display available values for a picklist field.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<Map<String, String>> getPicklistValues(String objectApiName, String fieldApiName) {
+        List<Map<String, String>> values = new List<Map<String, String>>();
+        
+        if (String.isBlank(objectApiName) || String.isBlank(fieldApiName)) {
+            return values;
+        }
+        
+        // Get object describe
+        Schema.SObjectType sObjectType = Schema.getGlobalDescribe().get(objectApiName);
+        if (sObjectType == null) {
+            return values;
+        }
+        
+        Map<String, Schema.SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
+        Schema.SObjectField field = fieldMap.get(fieldApiName);
+        
+        if (field == null) {
+            return values;
+        }
+        
+        Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+        List<Schema.PicklistEntry> picklistEntries = fieldDescribe.getPicklistValues();
+        
+        for (Schema.PicklistEntry entry : picklistEntries) {
+            if (entry.isActive()) {
+                Map<String, String> value = new Map<String, String>();
+                value.put('label', entry.getLabel());
+                value.put('value', entry.getValue());
+                values.add(value);
+            }
+        }
+        
+        return values;
+    }
+    
+    /**
+     * Generates trigger code for the specified object and picklist field.
+     * Used to create the trigger that will handle date stamping.
+     */
+    @AuraEnabled
+    public static String generateTriggerCode(String objectApiName, String fieldApiName, 
+                                            List<String> selectedValues, String entryPrefix, String exitPrefix) {
+        if (String.isBlank(objectApiName) || String.isBlank(fieldApiName)) {
+            throw new AuraHandledException('Object and field API names are required');
+        }
+        
+        String triggerName = 'DateStampTrigger_' + objectApiName + '_' + fieldApiName.replaceAll('__c', '');
+        String triggerCode = 'trigger ' + triggerName + ' on ' + objectApiName + ' (before insert, before update) {\n';
+        triggerCode += '    // Auto-generated trigger for date stamping\n';
+        triggerCode += '    // Field: ' + fieldApiName + '\n';
+        
+        if (selectedValues != null && !selectedValues.isEmpty()) {
+            triggerCode += '    // Values: ' + String.join(selectedValues, ', ') + '\n';
+        }
+        
+        if (String.isNotBlank(entryPrefix)) {
+            triggerCode += '    // Entry Date Prefix: ' + entryPrefix + '\n';
+        }
+        
+        if (String.isNotBlank(exitPrefix)) {
+            triggerCode += '    // Exit Date Prefix: ' + exitPrefix + '\n';
+        }
+        
+        triggerCode += '    \n';
+        triggerCode += '    // Trigger implementation would go here\n';
+        triggerCode += '    // This is a placeholder for the actual date stamping logic\n';
+        triggerCode += '}\n';
+        
+        return triggerCode;
+    }
+    
+    /**
+     * Deploys a trigger with the specified code and test class.
+     * This version accepts trigger code and test code directly.
+     */
+    public static String deployTrigger(String triggerCode, String testCode, String objectApiName, String fieldApiName) {
+        if (String.isBlank(triggerCode)) {
+            throw new AuraHandledException('Trigger code is required');
+        }
+        
+        // This is a stub implementation for testing
+        // In a real implementation, this would use the Metadata API to deploy the trigger
+        return 'DEPLOYMENT_ID_' + System.now().getTime();
     }
 }

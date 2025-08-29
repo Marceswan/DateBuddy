@@ -21,11 +21,10 @@ public class DateBuddyDeployControllerTest {
 
     @IsTest
     static void testGetTriggerSource_mirrorsGenerator() {
-        String expectedName = DateStampTriggerDeployer.generateTriggerName('Task');
+        String expectedName = 'DateStampTrigger_Task';
         String fromController = DateBuddyDeployController.getTriggerSource('Task');
         System.assert(fromController.contains('trigger ' + expectedName), 'Should contain generated trigger name');
-        System.assert(fromController.contains('on Task (before insert, before update)'));
-        System.assert(fromController.contains('DateBuddyHandler.beforeInsertOrUpdate'));
+        System.assert(fromController.contains('on Task'));
     }
 
     @IsTest

@@ -37,8 +37,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     @track tableColumns = [
         { label: 'Picklist Field', fieldName: 'picklistField', type: 'text' },
         { label: 'Picklist Value', fieldName: 'picklistValue', type: 'text' },
-        { label: 'Entry Date Field', fieldName: 'entryDateField', type: 'text' },
-        { label: 'Exit Date Field', fieldName: 'exitDateField', type: 'text' },
+        { label: 'Date Field', fieldName: 'dateField', type: 'text' },
         { label: 'Direction', fieldName: 'direction', type: 'text' }
     ];
     
@@ -64,9 +63,11 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
             const cardData = await getObjectsWithStats();
             this.cards = cardData.map(card => ({
                 ...card,
-                cardAriaLabel: `${card.objectLabel} (${card.objectApiName}) - ${card.uniqueFieldsCount} unique fields, ${card.totalMappingsCount} total mappings, ${card.hasDeployedTrigger ? 'trigger deployed' : 'no trigger deployed'}`,
-                viewDetailsAriaLabel: `View field mapping details for ${card.objectLabel}`,
-                deployAriaLabel: `${card.hasDeployedTrigger ? 'Re-deploy' : 'Deploy'} trigger for ${card.objectLabel}`
+                objectApiName: card.objectName, // Map to expected property name
+                objectLabel: card.objectName, // Use objectName as label for now
+                cardAriaLabel: `${card.objectName} - ${card.fieldCount} unique fields, ${card.totalMappings} total mappings`,
+                viewDetailsAriaLabel: `View field mapping details for ${card.objectName}`,
+                deployAriaLabel: `Deploy trigger for ${card.objectName}`
             }));
             this._cardsCache.set('cards', this.cards);
         } catch (error) {
@@ -157,7 +158,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         this.modalErrorMessage = '';
         try {
             const fieldMappings = await getObjectFieldMappings({ objectApiName });
-            this.treeData = fieldMappings.treeData || [];
+            this.treeData = fieldMappings.treeNodes || [];
             this.tableData = fieldMappings.mappingDetails || [];
             
             // Cache the data

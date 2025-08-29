@@ -43,29 +43,18 @@
                                         <div class="slds-text-body_small slds-text-color_weak">{card.objectApiName}</div>
                                     </div>
                                 </header>
-                                <div class="slds-no-flex">
-                                    <template if:true={card.hasDeployedTrigger}>
-                                        <span class="slds-badge slds-theme_success">
-                                            <lightning-icon icon-name="utility:success" size="xx-small" class="slds-m-right_xx-small"></lightning-icon>
-                                            Deployed
-                                        </span>
-                                    </template>
-                                    <template if:false={card.hasDeployedTrigger}>
-                                        <span class="slds-badge slds-theme_default">Not Deployed</span>
-                                    </template>
-                                </div>
                             </div>
                             <div class="slds-card__body slds-card__body_inner">
                                 <div class="slds-grid slds-wrap">
                                     <div class="slds-col slds-size_1-of-2">
                                         <div class="slds-text-align_center">
-                                            <div class="slds-text-heading_medium slds-text-color_default">{card.uniqueFieldsCount}</div>
+                                            <div class="slds-text-heading_medium slds-text-color_default">{card.fieldCount}</div>
                                             <div class="slds-text-body_small slds-text-color_weak">Unique Fields</div>
                                         </div>
                                     </div>
                                     <div class="slds-col slds-size_1-of-2">
                                         <div class="slds-text-align_center">
-                                            <div class="slds-text-heading_medium slds-text-color_default">{card.totalMappingsCount}</div>
+                                            <div class="slds-text-heading_medium slds-text-color_default">{card.totalMappings}</div>
                                             <div class="slds-text-body_small slds-text-color_weak">Total Mappings</div>
                                         </div>
                                     </div>
