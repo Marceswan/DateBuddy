@@ -28,14 +28,20 @@ Date_Stamp_Mapping__mdt fields:
 - `Object_API_Name__c` - Target object
 - `Picklist_API_Name__c` - Picklist field to monitor
 - `Picklist_Value__c` - Value to track
-- `Date_Field_API_Name__c` - Date field to stamp
-- `Direction__c` - "Entered" or "Exited" (optional)
+- `Date_Field_API_Name__c` - Entry date field to stamp (Label: "Entry Date Field API Name")
+- `Exit_Date_Field_API_Name__c` - Exit date field to stamp (optional)
+- `Direction__c` - "Entered"/"Exited"/"In"/"Out" (optional, used when only one date field is populated)
 
 ### Handler Logic
-DateBuddyHandler processes changes:
-1. **Entered**: Stamps date when value changes TO the target value
-2. **Exited**: Stamps date when value changes FROM the target value
-3. **Legacy**: Backward compatibility for records without Direction specified
+DateBuddyHandler processes changes based on populated fields:
+1. **Both Entry & Exit fields present**: Entry field maps to "entered", Exit field maps to "exited"
+2. **Only Entry field present**:
+   - If Direction is "Exited"/"Out": Maps to exited tracking
+   - Otherwise: Maps to entered tracking (default)
+3. **Only Exit field present**:
+   - If Direction is "Entered"/"In": Maps to entered tracking
+   - Otherwise: Maps to exited tracking (default)
+4. **Direction Support**: Accepts "Entered"/"Exited" and "In"/"Out" as equivalent values
 
 ## Testing Requirements
 - Minimum code coverage: 90%
@@ -46,6 +52,35 @@ DateBuddyHandler processes changes:
 - Uses SFDX for deployment
 - Deploy components individually when debugging
 - All tests must pass before considering work complete
+
+## 2GP Package Information
+### Package Details
+- **Package Name**: DateBuddy
+- **Package ID**: 0HoWs0000001qqzKAA
+- **Package Type**: Unlocked
+- **DevHub**: GSO-Org (marc-zbcx@force.com)
+- **API Version**: 64.0
+
+### Current Version
+- **Version Number**: 1.1.0-1
+- **Subscriber Package Version ID**: 04tWs000000aW1NIAU
+- **Installation URL**: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU
+
+### Version History
+- **1.1.0-1** (04tWs000000aW1NIAU) - Added MetadataServiceTest class for improved test coverage
+- **1.0.0-1** (04tWs000000aVzlIAE) - Initial release with core DateBuddy functionality
+
+### Package Management Commands
+```bash
+# Create new package version
+sf package version create --package DateBuddy --installation-key-bypass --wait 20 --skip-validation
+
+# Install package
+sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG --wait 10
+
+# List package versions
+sf package version list --package DateBuddy
+```
 
 ## TODO - Deployer LWC Enhancement
 In the Deployer LWC page:
