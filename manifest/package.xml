@@ -26,7 +26,6 @@
         <members>Date_Stamp_Mapping__mdt.Object_API_Name__c</members>
         <members>Date_Stamp_Mapping__mdt.Picklist_API_Name__c</members>
         <members>Date_Stamp_Mapping__mdt.Picklist_Value__c</members>
-        <members>Date_Stamp_Mapping__mdt.Date_Field_API_Name__c</members>
         <members>Date_Stamp_Mapping__mdt.Direction__c</members>
         <name>CustomField</name>
     </types>

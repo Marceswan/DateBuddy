@@ -23,26 +23,46 @@ public class UpdateDateFieldAction {
             List<Date_Stamp_Mapping__mdt> mappings;
             // If a direction is provided, add it to the query criteria.
             if (String.isNotBlank(request.direction)) {
-                mappings = [SELECT Date_Field_API_Name__c, Direction__c 
+                mappings = [SELECT Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c 
                             FROM Date_Stamp_Mapping__mdt 
                             WHERE Object_API_Name__c = :request.objectApiName 
                               AND Picklist_API_Name__c = :request.picklistApiName 
                               AND Picklist_Value__c = :request.picklistValue
                               AND Direction__c = :request.direction];
             } else {
-                mappings = [SELECT Date_Field_API_Name__c, Direction__c 
+                mappings = [SELECT Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c 
                             FROM Date_Stamp_Mapping__mdt 
                             WHERE Object_API_Name__c = :request.objectApiName 
                               AND Picklist_API_Name__c = :request.picklistApiName 
                               AND Picklist_Value__c = :request.picklistValue];
             }
             if (!mappings.isEmpty()) {
-                String dateFieldApiName = mappings[0].Date_Field_API_Name__c;
-                Id recordId = request.recordId; // store the record Id separately
-                SObject record = Database.query('SELECT ' + dateFieldApiName + ' FROM ' + request.objectApiName + ' WHERE Id = :recordId');
-                if (record.get(dateFieldApiName) == null) {
-                    record.put(dateFieldApiName, Date.today());
-                    update record;
+                Date_Stamp_Mapping__mdt mapping = mappings[0];
+                String dateFieldApiName = null;
+                
+                // Determine which date field to use based on populated fields and direction
+                Boolean hasEntryField = mapping.Date_Field_API_Name__c != null;
+                Boolean hasExitField = mapping.Exit_Date_Field_API_Name__c != null;
+                String direction = mapping.Direction__c;
+                
+                if (hasEntryField && hasExitField) {
+                    // Both fields present - use Entry field (default behavior)
+                    dateFieldApiName = mapping.Date_Field_API_Name__c;
+                } else if (hasEntryField) {
+                    // Only Entry field present
+                    dateFieldApiName = mapping.Date_Field_API_Name__c;
+                } else if (hasExitField) {
+                    // Only Exit field present
+                    dateFieldApiName = mapping.Exit_Date_Field_API_Name__c;
+                }
+                
+                if (dateFieldApiName != null) {
+                    Id recordId = request.recordId; // store the record Id separately
+                    SObject record = Database.query('SELECT ' + dateFieldApiName + ' FROM ' + request.objectApiName + ' WHERE Id = :recordId');
+                    if (record.get(dateFieldApiName) == null) {
+                        record.put(dateFieldApiName, Date.today());
+                        update record;
+                    }
                 }
             }
         }

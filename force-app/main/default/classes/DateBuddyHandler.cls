@@ -8,8 +8,9 @@ public with sharing class DateBuddyHandler {
      * - Object_API_Name__c
      * - Picklist_API_Name__c
      * - Picklist_Value__c
-     * - Date_Field_API_Name__c
-     * - Direction__c (optional: 'Entered'/'In' or 'Exited'/'Out')
+     * - Date_Field_API_Name__c - Date field to stamp on entry (optional)
+     * - Exit_Date_Field_API_Name__c - Date field to stamp on exit (optional)
+     * - Direction__c (optional: 'Entered'/'In' or 'Exited'/'Out' - used when only one date field is populated)
      */
     public static void beforeInsertOrUpdate(List<SObject> newList, Map<Id, SObject> oldMap) {
         if (newList == null || newList.isEmpty()) return;
@@ -18,7 +19,7 @@ public with sharing class DateBuddyHandler {
 
         List<Date_Stamp_Mapping__mdt> mappings = [
             SELECT Object_API_Name__c, Picklist_API_Name__c, Picklist_Value__c, 
-                   Date_Field_API_Name__c, Direction__c
+                   Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c
             FROM Date_Stamp_Mapping__mdt
             WHERE Object_API_Name__c = :objectApiName
         ];
@@ -30,8 +31,15 @@ public with sharing class DateBuddyHandler {
         // Organize mappings by type for efficient processing
         MappingConfig config = new MappingConfig();
         for (Date_Stamp_Mapping__mdt m : mappings) {
-            if (!fieldMap.containsKey(m.Picklist_API_Name__c) || !fieldMap.containsKey(m.Date_Field_API_Name__c)) {
-                continue; // skip invalid field references
+            // Validate picklist field exists
+            if (!fieldMap.containsKey(m.Picklist_API_Name__c)) {
+                continue;
+            }
+            // Validate at least one date field exists and is valid
+            Boolean hasValidEntryField = m.Date_Field_API_Name__c != null && fieldMap.containsKey(m.Date_Field_API_Name__c);
+            Boolean hasValidExitField = m.Exit_Date_Field_API_Name__c != null && fieldMap.containsKey(m.Exit_Date_Field_API_Name__c);
+            if (!hasValidEntryField && !hasValidExitField) {
+                continue; // skip if neither date field is valid
             }
             config.addMapping(m);
         }
@@ -67,14 +75,6 @@ public with sharing class DateBuddyHandler {
                         }
                     }
                 }
-                
-                // Handle legacy mappings without Direction specified (backward compatibility)
-                if (config.hasLegacyMapping(pickField, newValue)) {
-                    String dateField = config.getLegacyDateField(pickField, newValue);
-                    if (rec.get(dateField) == null) {
-                        rec.put(dateField, Date.today());
-                    }
-                }
             }
         }
     }
@@ -99,37 +99,54 @@ public with sharing class DateBuddyHandler {
         // Maps for "Exited" direction: picklistField -> (value -> dateField)
         private Map<String, Map<String, String>> exitedMappings = new Map<String, Map<String, String>>();
         
-        // Maps for legacy (no direction) mappings: picklistField -> (value -> dateField)
-        private Map<String, Map<String, String>> legacyMappings = new Map<String, Map<String, String>>();
-        
         public void addMapping(Date_Stamp_Mapping__mdt mapping) {
             String direction = mapping.Direction__c;
-            Map<String, Map<String, String>> targetMap;
+            Boolean hasEntryField = mapping.Date_Field_API_Name__c != null;
+            Boolean hasExitField = mapping.Exit_Date_Field_API_Name__c != null;
             
-            // Support both 'Entered'/'In' and 'Exited'/'Out' values
-            if (direction == 'Entered' || direction == 'In') {
-                targetMap = enteredMappings;
-            } else if (direction == 'Exited' || direction == 'Out') {
-                targetMap = exitedMappings;
-            } else {
-                // No direction specified - legacy behavior
-                targetMap = legacyMappings;
-            }
+            // Logic for determining which mappings to create:
+            // 1. If both fields present, map Entry to enteredMappings and Exit to exitedMappings
+            // 2. If only Entry field present:
+            //    - If Direction is 'Exited'/'Out', map to exitedMappings
+            //    - Otherwise map to enteredMappings
+            // 3. If only Exit field present:
+            //    - If Direction is 'Entered'/'In', map to enteredMappings  
+            //    - Otherwise map to exitedMappings
             
-            if (!targetMap.containsKey(mapping.Picklist_API_Name__c)) {
-                targetMap.put(mapping.Picklist_API_Name__c, new Map<String, String>());
+            if (hasEntryField && hasExitField) {
+                // Both fields present - map Entry to entered, Exit to exited
+                addToMap(enteredMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Date_Field_API_Name__c);
+                addToMap(exitedMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
+            } else if (hasEntryField) {
+                // Only Entry field present - check Direction
+                if (direction == 'Exited' || direction == 'Out') {
+                    addToMap(exitedMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Date_Field_API_Name__c);
+                } else {
+                    // Default to entered for Entry field (includes null Direction)
+                    addToMap(enteredMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Date_Field_API_Name__c);
+                }
+            } else if (hasExitField) {
+                // Only Exit field present - check Direction
+                if (direction == 'Entered' || direction == 'In') {
+                    addToMap(enteredMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
+                } else {
+                    // Default to exited for Exit field (includes null Direction)
+                    addToMap(exitedMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
+                }
             }
-            targetMap.get(mapping.Picklist_API_Name__c).put(
-                mapping.Picklist_Value__c, 
-                mapping.Date_Field_API_Name__c
-            );
+        }
+        
+        private void addToMap(Map<String, Map<String, String>> targetMap, String picklistField, String picklistValue, String dateField) {
+            if (!targetMap.containsKey(picklistField)) {
+                targetMap.put(picklistField, new Map<String, String>());
+            }
+            targetMap.get(picklistField).put(picklistValue, dateField);
         }
         
         public Set<String> getAllPicklistFields() {
             Set<String> allFields = new Set<String>();
             allFields.addAll(enteredMappings.keySet());
             allFields.addAll(exitedMappings.keySet());
-            allFields.addAll(legacyMappings.keySet());
             return allFields;
         }
         
@@ -151,16 +168,6 @@ public with sharing class DateBuddyHandler {
         
         public String getExitedDateField(String pickField, String value) {
             return exitedMappings.get(pickField).get(value);
-        }
-        
-        public Boolean hasLegacyMapping(String pickField, String value) {
-            return legacyMappings.containsKey(pickField) && 
-                   value != null &&
-                   legacyMappings.get(pickField).containsKey(value);
-        }
-        
-        public String getLegacyDateField(String pickField, String value) {
-            return legacyMappings.get(pickField).get(value);
         }
     }
 }
