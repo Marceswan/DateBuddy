@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Salesforce
+.sfdx/
+.sf/
+*.log
+coverage/
+
+# Editors
+.vscode/
+.idea/
+*.iml
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# Misc
+.env*
+.history/

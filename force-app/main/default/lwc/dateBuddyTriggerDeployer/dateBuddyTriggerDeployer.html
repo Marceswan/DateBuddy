@@ -1,0 +1,18 @@
+<template>
+    <div class="container">
+        <h2>DateBuddy Trigger Deployer</h2>
+        <lightning-combobox name="objectPick"
+                            label="Object API Name"
+                            value={objectApiName}
+                            placeholder="Select an object"
+                            options={options}
+                            onchange={handleChange}>
+        </lightning-combobox>
+        <div class="actions">
+            <lightning-button variant="brand" label="Deploy Trigger" onclick={deploy} disabled={isBusy || !objectApiName}></lightning-button>
+        </div>
+        <template if:true={message}>
+            <div class="msg">{message}</div>
+        </template>
+    </div>
+</template>

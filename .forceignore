@@ -1,0 +1,13 @@
+# Ignore unpackaged directories
+**/.*
+**/node_modules
+**/*.log
+coverage/
+.sfdx/
+.sf/
+.vscode/
+.idea/
+*.tmp
+*.iml
+**/package-lock.json
+**/yarn.lock
