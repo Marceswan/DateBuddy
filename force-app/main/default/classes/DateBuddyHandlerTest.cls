@@ -1667,27 +1667,31 @@ public class DateBuddyHandlerTest {
         testObjects.add(pb);
         
         // Test UPDATE scenario for exit logic (lines 70, 72, 73)
-        // Create Campaign objects which might have CMDT mappings
-        List<Campaign> campaigns = new List<Campaign>();
+        // Create Contact objects with LeadSource picklist field
+        Account testAccount = new Account(Name = 'Final Coverage Test Account');
+        insert testAccount;
+        
+        List<Contact> contacts = new List<Contact>();
         for (Integer i = 0; i < 2; i++) {
-            campaigns.add(new Campaign(
-                Name = 'Final Coverage Campaign ' + i,
-                Status = 'Planned',
-                Type = 'Email'
+            contacts.add(new Contact(
+                FirstName = 'Final Coverage',
+                LastName = 'Contact ' + i,
+                AccountId = testAccount.Id,
+                LeadSource = 'Web'  // Using standard LeadSource picklist
             ));
         }
-        insert campaigns;
+        insert contacts;
         
         // Set up old map to trigger exit conditions
         Map<Id, SObject> oldMap = new Map<Id, SObject>();
         List<SObject> updateRecords = new List<SObject>();
         
-        for (Campaign camp : campaigns) {
-            Campaign oldCamp = camp.clone(true, true, true, true);
-            oldCamp.Status = 'Planned'; // Old value
-            camp.Status = 'Completed'; // New value - should trigger exit if mapped
-            oldMap.put(camp.Id, oldCamp);
-            updateRecords.add(camp);
+        for (Contact con : contacts) {
+            Contact oldCon = con.clone(true, true, true, true);
+            oldCon.LeadSource = 'Web'; // Old value
+            con.LeadSource = 'Phone Inquiry'; // New value - should trigger exit if mapped
+            oldMap.put(con.Id, oldCon);
+            updateRecords.add(con);
         }
         
         Test.startTest();
