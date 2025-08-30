@@ -71,7 +71,7 @@
                                     <button class="slds-button slds-button_brand slds-button_small"
                                             onclick={handleDeployClick}
                                             data-object={card.objectApiName}
-                                            disabled={isDeployDisabled}
+                                            disabled={isBusy}
                                             aria-label={card.deployAriaLabel}>
                                         <template if:true={card.hasDeployedTrigger}>
                                             Re-deploy
@@ -226,7 +226,7 @@
                     </button>
                     <button class="slds-button slds-button_brand" 
                             onclick={handleModalDeploy}
-                            disabled={isDeployDisabled}>
+                            disabled={isBusy}>
                         Deploy Trigger for {selectedObjectApiName}
                     </button>
                 </footer>
