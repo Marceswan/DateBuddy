@@ -295,13 +295,25 @@ public with sharing class DateBuddyDeployController {
                     String direction;
                     String displayDateField;
                     
-                    if (directionValue != null && directionValue.equalsIgnoreCase('Exited')) {
-                        direction = 'Exited';
-                        displayDateField = hasExitField ? exitDateField : dateField;
-                    } else if (!hasEntryField && hasExitField && String.isBlank(directionValue)) {
+                    // Logic must match DateBuddyHandler.MappingConfig.addMapping():
+                    // 1. If only Exit field present: ALWAYS map to exited
+                    // 2. If only Entry field present + Direction is 'Exited'/'Out': map to exited
+                    // 3. Otherwise: map to entered (default)
+                    
+                    if (hasExitField && !hasEntryField) {
+                        // Only Exit field present - ALWAYS show as Exited
                         direction = 'Exited';
                         displayDateField = exitDateField;
+                    } else if (hasEntryField && !hasExitField) {
+                        // Only Entry field present - check Direction
+                        if (directionValue == 'Exited' || directionValue == 'Out') {
+                            direction = 'Exited';
+                        } else {
+                            direction = 'Entered';
+                        }
+                        displayDateField = dateField;
                     } else {
+                        // Fallback (shouldn't happen but handle gracefully)
                         direction = 'Entered';
                         displayDateField = dateField;
                     }
