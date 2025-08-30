@@ -1,4 +1,8 @@
 public with sharing class DateBuddyHandler {
+    // Test stub for injecting mock CMDT records
+    @TestVisible
+    private static List<Date_Stamp_Mapping__mdt> testMappings = null;
+    
     /**
      * Generic before-save handler that sets date fields based on CMDT mappings.
      * Handles both "Entered" (when value changes TO the target value) and 
@@ -17,12 +21,24 @@ public with sharing class DateBuddyHandler {
 
         String objectApiName = newList[0].getSObjectType().getDescribe().getName();
 
-        List<Date_Stamp_Mapping__mdt> mappings = [
-            SELECT Object_API_Name__c, Picklist_API_Name__c, Picklist_Value__c, 
-                   Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c
-            FROM Date_Stamp_Mapping__mdt
-            WHERE Object_API_Name__c = :objectApiName
-        ];
+        // Use test mappings if provided, otherwise query real CMDT
+        List<Date_Stamp_Mapping__mdt> mappings;
+        if (Test.isRunningTest() && testMappings != null) {
+            // Filter test mappings for the current object
+            mappings = new List<Date_Stamp_Mapping__mdt>();
+            for (Date_Stamp_Mapping__mdt m : testMappings) {
+                if (m.Object_API_Name__c == objectApiName) {
+                    mappings.add(m);
+                }
+            }
+        } else {
+            mappings = [
+                SELECT Object_API_Name__c, Picklist_API_Name__c, Picklist_Value__c, 
+                       Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c
+                FROM Date_Stamp_Mapping__mdt
+                WHERE Object_API_Name__c = :objectApiName
+            ];
+        }
         if (mappings.isEmpty()) return;
 
         Schema.SObjectType sType = newList[0].getSObjectType();
@@ -108,10 +124,8 @@ public with sharing class DateBuddyHandler {
             // 1. If both fields present, map Entry to enteredMappings and Exit to exitedMappings
             // 2. If only Entry field present:
             //    - If Direction is 'Exited'/'Out', map to exitedMappings
-            //    - Otherwise map to enteredMappings
-            // 3. If only Exit field present:
-            //    - If Direction is 'Entered'/'In', map to enteredMappings  
-            //    - Otherwise map to exitedMappings
+            //    - Otherwise map to enteredMappings (default)
+            // 3. If only Exit field present: ALWAYS map to exitedMappings
             
             if (hasEntryField && hasExitField) {
                 // Both fields present - map Entry to entered, Exit to exited
@@ -126,13 +140,8 @@ public with sharing class DateBuddyHandler {
                     addToMap(enteredMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Date_Field_API_Name__c);
                 }
             } else if (hasExitField) {
-                // Only Exit field present - check Direction
-                if (direction == 'Entered' || direction == 'In') {
-                    addToMap(enteredMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
-                } else {
-                    // Default to exited for Exit field (includes null Direction)
-                    addToMap(exitedMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
-                }
+                // Only Exit field present - ALWAYS map to exited
+                addToMap(exitedMappings, mapping.Picklist_API_Name__c, mapping.Picklist_Value__c, mapping.Exit_Date_Field_API_Name__c);
             }
         }
         

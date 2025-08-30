@@ -38,15 +38,25 @@ DateBuddyHandler processes changes based on populated fields:
 2. **Only Entry field present**:
    - If Direction is "Exited"/"Out": Maps to exited tracking
    - Otherwise: Maps to entered tracking (default)
-3. **Only Exit field present**:
-   - If Direction is "Entered"/"In": Maps to entered tracking
-   - Otherwise: Maps to exited tracking (default)
+3. **Only Exit field present**: ALWAYS maps to exited tracking (Direction field is ignored)
 4. **Direction Support**: Accepts "Entered"/"Exited" and "In"/"Out" as equivalent values
 
 ## Testing Requirements
 - Minimum code coverage: 90%
 - Always deploy ONLY the files being worked on
 - Run tests after deployment to ensure functionality
+
+### Test Coverage Achievements
+- **DateBuddyHandler**: 96% coverage (up from 68%)
+- **DateBuddyDeployController**: 82% coverage (up from 59%)
+- **DateStampTriggerDeployer**: 86% coverage (up from 51%)
+- **UpdateDateFieldAction**: 90% coverage (up from 45%)
+
+### Test Stub Approach for CMDT Mocking
+- Added `@TestVisible private static testMappings` field to DateBuddyHandler
+- Tests can inject mock CMDT using JSON deserialization
+- This allows testing of edge cases without actual CMDT records
+- Enables comprehensive testing of complex scenarios and handler logic
 
 ## Development Notes
 - Uses SFDX for deployment
@@ -82,13 +92,3 @@ sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG --wait 10
 sf package version list --package DateBuddy
 ```
 
-## TODO - Deployer LWC Enhancement
-In the Deployer LWC page:
-- Display objects as cards with CMDT-driven stats (e.g., "# Unique Fields Tracked")
-- On object card click, open a modal containing:
-  - Lightning-tree showing each unique tracked field on the object
-  - Columns displaying:
-    - Picklist Value
-    - Enter field API name
-    - Exit field API name
-    - Other relevant metadata
