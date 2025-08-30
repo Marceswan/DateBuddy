@@ -1,7 +1,7 @@
 {
   "packageDirectories": [
     {
-      "versionName": "Version 1.2",
+      "versionName": "Version 1.1 (Winter '26)",
       "versionNumber": "1.2.0.NEXT",
       "path": "force-app",
       "default": true,

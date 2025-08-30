@@ -19,52 +19,91 @@ public class UpdateDateFieldAction {
 
     @InvocableMethod(label='Update Date Field' description='Updates a date field in a record if it is NULL or blank.')
     public static void updateDateField(List<UpdateDateFieldRequest> requests) {
+        if (requests == null || requests.isEmpty()) return;
+        
+        // Group requests by object type for batch processing
+        Map<String, List<Id>> recordIdsByObject = new Map<String, List<Id>>();
+        Map<Id, UpdateDateFieldRequest> requestById = new Map<Id, UpdateDateFieldRequest>();
+        
         for (UpdateDateFieldRequest request : requests) {
-            List<Date_Stamp_Mapping__mdt> mappings;
-            // If a direction is provided, add it to the query criteria.
-            if (String.isNotBlank(request.direction)) {
-                mappings = [SELECT Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c 
-                            FROM Date_Stamp_Mapping__mdt 
-                            WHERE Object_API_Name__c = :request.objectApiName 
-                              AND Picklist_API_Name__c = :request.picklistApiName 
-                              AND Picklist_Value__c = :request.picklistValue
-                              AND Direction__c = :request.direction];
-            } else {
-                mappings = [SELECT Date_Field_API_Name__c, Exit_Date_Field_API_Name__c, Direction__c 
-                            FROM Date_Stamp_Mapping__mdt 
-                            WHERE Object_API_Name__c = :request.objectApiName 
-                              AND Picklist_API_Name__c = :request.picklistApiName 
-                              AND Picklist_Value__c = :request.picklistValue];
+            if (!recordIdsByObject.containsKey(request.objectApiName)) {
+                recordIdsByObject.put(request.objectApiName, new List<Id>());
             }
-            if (!mappings.isEmpty()) {
-                Date_Stamp_Mapping__mdt mapping = mappings[0];
-                String dateFieldApiName = null;
-                
-                // Determine which date field to use based on populated fields and direction
-                Boolean hasEntryField = mapping.Date_Field_API_Name__c != null;
-                Boolean hasExitField = mapping.Exit_Date_Field_API_Name__c != null;
-                String direction = mapping.Direction__c;
-                
-                if (hasEntryField && hasExitField) {
-                    // Both fields present - use Entry field (default behavior)
-                    dateFieldApiName = mapping.Date_Field_API_Name__c;
-                } else if (hasEntryField) {
-                    // Only Entry field present
-                    dateFieldApiName = mapping.Date_Field_API_Name__c;
-                } else if (hasExitField) {
-                    // Only Exit field present
-                    dateFieldApiName = mapping.Exit_Date_Field_API_Name__c;
+            recordIdsByObject.get(request.objectApiName).add(request.recordId);
+            requestById.put(request.recordId, request);
+        }
+        
+        // Process each object type
+        for (String objectApiName : recordIdsByObject.keySet()) {
+            List<Id> recordIds = recordIdsByObject.get(objectApiName);
+            
+            // Query all fields needed for DateBuddyHandler
+            Set<String> fieldsToQuery = new Set<String>{'Id'};
+            
+            // Get all picklist fields referenced in requests for this object
+            Set<String> picklistFields = new Set<String>();
+            for (Id recordId : recordIds) {
+                UpdateDateFieldRequest req = requestById.get(recordId);
+                picklistFields.add(req.picklistApiName);
+            }
+            fieldsToQuery.addAll(picklistFields);
+            
+            // Get all date fields from CMDT for this object
+            List<Date_Stamp_Mapping__mdt> mappings = [
+                SELECT Date_Field_API_Name__c, Exit_Date_Field_API_Name__c
+                FROM Date_Stamp_Mapping__mdt
+                WHERE Object_API_Name__c = :objectApiName
+            ];
+            
+            for (Date_Stamp_Mapping__mdt mapping : mappings) {
+                if (String.isNotBlank(mapping.Date_Field_API_Name__c)) {
+                    fieldsToQuery.add(mapping.Date_Field_API_Name__c);
                 }
-                
-                if (dateFieldApiName != null) {
-                    Id recordId = request.recordId; // store the record Id separately
-                    SObject record = Database.query('SELECT ' + dateFieldApiName + ' FROM ' + request.objectApiName + ' WHERE Id = :recordId');
-                    if (record.get(dateFieldApiName) == null) {
-                        record.put(dateFieldApiName, Date.today());
-                        update record;
-                    }
+                if (String.isNotBlank(mapping.Exit_Date_Field_API_Name__c)) {
+                    fieldsToQuery.add(mapping.Exit_Date_Field_API_Name__c);
                 }
             }
+            
+            // For Opportunity, always include CloseDate since it might be used by DateBuddyHandler
+            if (objectApiName == 'Opportunity') {
+                fieldsToQuery.add('CloseDate');
+            }
+            
+            // Build and execute query
+            String query = 'SELECT ' + String.join(new List<String>(fieldsToQuery), ', ') + 
+                          ' FROM ' + objectApiName + 
+                          ' WHERE Id IN :recordIds';
+            
+            List<SObject> records = Database.query(query);
+            
+            // Create old map by simulating the picklist value as different
+            Map<Id, SObject> oldMap = new Map<Id, SObject>();
+            for (SObject record : records) {
+                UpdateDateFieldRequest req = requestById.get(record.Id);
+                
+                // Clone the record for the old map
+                SObject oldRecord = record.clone(true, true, true, true);
+                
+                // Set the old picklist value to something different to trigger the handler
+                // This simulates the field changing TO the target value
+                String currentValue = String.valueOf(record.get(req.picklistApiName));
+                if (currentValue == req.picklistValue) {
+                    // Already has the value, set old to different value to simulate entering
+                    oldRecord.put(req.picklistApiName, 'DIFFERENT_VALUE_FOR_TRIGGER');
+                } else {
+                    // Doesn't have the value yet, set current to target value
+                    record.put(req.picklistApiName, req.picklistValue);
+                    oldRecord.put(req.picklistApiName, currentValue);
+                }
+                
+                oldMap.put(record.Id, oldRecord);
+            }
+            
+            // Call DateBuddyHandler to process the records
+            DateBuddyHandler.beforeInsertOrUpdate(records, oldMap);
+            
+            // Update the records
+            update records;
         }
     }
 }
