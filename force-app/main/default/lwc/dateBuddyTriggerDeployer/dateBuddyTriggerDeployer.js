@@ -4,8 +4,11 @@ import deployTrigger from '@salesforce/apex/DateBuddyDeployController.deployTrig
 import getStatus from '@salesforce/apex/DateBuddyDeployController.getStatus';
 import listSObjects from '@salesforce/apex/DateBuddyDeployController.listSObjects';
 import getTriggerSource from '@salesforce/apex/DateBuddyDeployController.getTriggerSource';
+import getObjectsWithStats from '@salesforce/apex/DateBuddyDeployController.getObjectsWithStats';
+import getObjectFieldMappings from '@salesforce/apex/DateBuddyDeployController.getObjectFieldMappings';
 
 export default class DateBuddyTriggerDeployer extends LightningElement {
+    // Legacy properties (preserved for backward compatibility)
     @track objectApiName = '';
     @track isBusy = false;
     @track message = '';
@@ -14,15 +17,202 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     @track canRetry = false;
     pollTimer;
 
+    // New card-based UI properties
+    @track cards = [];
+    @track isLoading = false;
+    @track errorMessage = '';
+    
+    // Legacy mode properties
+    @track showLegacyMode = false;
+    @track legacyOptions = [];
+    
+    // Modal properties
+    @track showModal = false;
+    @track isLoadingModal = false;
+    @track modalErrorMessage = '';
+    @track selectedObjectApiName = '';
+    @track selectedObjectLabel = '';
+    @track treeData = [];
+    @track tableData = [];
+    @track tableColumns = [
+        { label: 'Picklist Field', fieldName: 'picklistField', type: 'text' },
+        { label: 'Picklist Value', fieldName: 'picklistValue', type: 'text' },
+        { label: 'Date Field', fieldName: 'dateField', type: 'text' },
+        { label: 'Direction', fieldName: 'direction', type: 'text' }
+    ];
+    
+    // Cache for performance
+    _cardsCache = new Map();
+    _fieldMappingsCache = new Map();
+
     async connectedCallback() {
+        await this.loadCards();
+        await this.loadLegacyOptions();
+    }
+
+    // New methods for enhanced UI
+    async loadCards() {
+        if (this._cardsCache.has('cards')) {
+            this.cards = this._cardsCache.get('cards');
+            return;
+        }
+
+        this.isLoading = true;
+        this.errorMessage = '';
         try {
-            const names = await listSObjects();
-            this.options = names.map(n => ({ label: n, value: n }));
-        } catch (e) {
-            this.message = e?.body?.message || e?.message || 'Failed to load objects';
+            const cardData = await getObjectsWithStats();
+            this.cards = cardData.map(card => ({
+                ...card,
+                objectApiName: card.objectName, // Map to expected property name
+                objectLabel: card.objectName, // Use objectName as label for now
+                cardAriaLabel: `${card.objectName} - ${card.fieldCount} unique fields, ${card.totalMappings} total mappings`,
+                viewDetailsAriaLabel: `View field mapping details for ${card.objectName}`,
+                deployAriaLabel: `Deploy trigger for ${card.objectName}`
+            }));
+            this._cardsCache.set('cards', this.cards);
+        } catch (error) {
+            this.errorMessage = error?.body?.message || error?.message || 'Failed to load objects with statistics';
+            this.showToast('Error', this.errorMessage, 'error');
+        } finally {
+            this.isLoading = false;
         }
     }
 
+    async loadLegacyOptions() {
+        try {
+            const names = await listSObjects();
+            this.legacyOptions = names.map(n => ({ label: n, value: n }));
+            this.options = [...this.legacyOptions]; // Keep backward compatibility
+        } catch (error) {
+            const errorMsg = error?.body?.message || error?.message || 'Failed to load objects';
+            this.message = errorMsg;
+        }
+    }
+
+    // Card interaction handlers
+    handleCardClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const objectApiName = event.currentTarget.dataset.object;
+        this.openModal(objectApiName);
+    }
+
+    handleCardKeyDown(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            const objectApiName = event.currentTarget.dataset.object;
+            this.openModal(objectApiName);
+        }
+    }
+
+    handleViewDetailsClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const objectApiName = event.currentTarget.dataset.object;
+        this.openModal(objectApiName);
+    }
+
+    handleDeployClick(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const objectApiName = event.currentTarget.dataset.object;
+        this.objectApiName = objectApiName;
+        this.deploy();
+    }
+
+    // Modal management
+    async openModal(objectApiName) {
+        const card = this.cards.find(c => c.objectApiName === objectApiName);
+        if (!card) return;
+
+        this.selectedObjectApiName = objectApiName;
+        this.selectedObjectLabel = card.objectLabel;
+        this.showModal = true;
+        this.modalErrorMessage = '';
+        
+        await this.loadFieldMappings(objectApiName);
+    }
+
+    closeModal() {
+        this.showModal = false;
+        this.isLoadingModal = false;
+        this.modalErrorMessage = '';
+        this.selectedObjectApiName = '';
+        this.selectedObjectLabel = '';
+        
+        // Clear modal data for memory management
+        this.treeData = [];
+        this.tableData = [];
+    }
+
+    async loadFieldMappings(objectApiName) {
+        const cacheKey = `fieldMappings_${objectApiName}`;
+        if (this._fieldMappingsCache.has(cacheKey)) {
+            const cachedData = this._fieldMappingsCache.get(cacheKey);
+            this.treeData = cachedData.treeData;
+            this.tableData = cachedData.tableData;
+            return;
+        }
+
+        this.isLoadingModal = true;
+        this.modalErrorMessage = '';
+        try {
+            const fieldMappings = await getObjectFieldMappings({ objectApiName });
+            this.treeData = fieldMappings.treeNodes || [];
+            this.tableData = fieldMappings.mappingDetails || [];
+            
+            // Cache the data
+            this._fieldMappingsCache.set(cacheKey, {
+                treeData: this.treeData,
+                tableData: this.tableData
+            });
+        } catch (error) {
+            this.modalErrorMessage = error?.body?.message || error?.message || 'Failed to load field mappings';
+            this.showToast('Error', this.modalErrorMessage, 'error');
+        } finally {
+            this.isLoadingModal = false;
+        }
+    }
+
+    handleModalDeploy() {
+        this.objectApiName = this.selectedObjectApiName;
+        this.closeModal();
+        this.deploy();
+    }
+
+    // Tree selection handler
+    handleTreeSelection(event) {
+        const selectedName = event.detail.name;
+        console.log('Selected tree node:', selectedName);
+        // Additional logic for tree selection can be added here
+    }
+
+    // Legacy mode toggle
+    toggleLegacyMode() {
+        this.showLegacyMode = !this.showLegacyMode;
+    }
+
+    handleLegacyChange(event) {
+        this.handleChange(event);
+    }
+
+    // Computed properties
+    get hasModalData() {
+        return (this.treeData && this.treeData.length > 0) || (this.tableData && this.tableData.length > 0);
+    }
+
+    // Utility methods
+    showToast(title, message, variant) {
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title,
+                message,
+                variant
+            })
+        );
+    }
+
+    // Legacy methods (preserved for backward compatibility)
     handleChange(event) {
         this.objectApiName = event.detail.value;
         this.source = '';

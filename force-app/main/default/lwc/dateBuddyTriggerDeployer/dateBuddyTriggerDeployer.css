@@ -1,0 +1,148 @@
+/* DateBuddy Trigger Deployer - Minimal custom CSS using SLDS variables */
+
+/* Custom card hover effects using SLDS design tokens */
+.datebuddy-object-card {
+    cursor: pointer;
+    transition: box-shadow 0.2s ease-in-out, transform 0.1s ease-in-out;
+    border: 1px solid var(--sds-c-card-color-border);
+}
+
+.datebuddy-object-card:hover {
+    box-shadow: var(--sds-c-card-shadow-hover, 0 2px 4px rgba(0, 0, 0, 0.1));
+    transform: translateY(-1px);
+}
+
+.datebuddy-object-card:focus {
+    outline: 2px solid var(--sds-c-button-color-border-primary);
+    outline-offset: 2px;
+}
+
+.datebuddy-object-card:active {
+    transform: translateY(0);
+    box-shadow: var(--sds-c-card-shadow);
+}
+
+/* Ensure proper spacing for card grid on smaller screens */
+@media (max-width: 768px) {
+    .datebuddy-object-card {
+        margin-bottom: 0.75rem;
+    }
+}
+
+/* Custom badge styling for consistency */
+.datebuddy-status-badge {
+    font-weight: var(--sds-c-badge-font-weight);
+    border-radius: var(--sds-c-badge-radius);
+}
+
+/* Legacy mode container styling */
+.datebuddy-legacy-container {
+    background-color: var(--sds-c-color-background-alt);
+    border: 1px solid var(--sds-c-color-border);
+    border-radius: var(--sds-c-card-radius-border);
+}
+
+/* Modal content spacing */
+.datebuddy-modal-content {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* Tree and table container styling */
+.datebuddy-tree-container,
+.datebuddy-table-container {
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--sds-c-color-border);
+    border-radius: var(--sds-c-card-radius-border);
+    background-color: var(--sds-c-color-background);
+}
+
+/* Loading state overlay */
+.datebuddy-loading-overlay {
+    position: relative;
+    min-height: 100px;
+}
+
+/* Error message styling consistency */
+.datebuddy-error-message {
+    border-left: 4px solid var(--sds-c-color-border-error);
+    padding-left: var(--sds-c-spacing-small);
+}
+
+/* Card statistics styling */
+.datebuddy-stat-item {
+    text-align: center;
+    padding: var(--sds-c-spacing-x-small);
+}
+
+.datebuddy-stat-number {
+    font-size: var(--sds-c-font-size-7);
+    font-weight: var(--sds-c-font-weight-bold);
+    color: var(--sds-c-color-text-default);
+    line-height: 1;
+}
+
+.datebuddy-stat-label {
+    font-size: var(--sds-c-font-size-1);
+    color: var(--sds-c-color-text-weak);
+    margin-top: var(--sds-c-spacing-xx-small);
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 480px) {
+    .datebuddy-object-card .slds-card__footer .slds-grid {
+        display: block;
+    }
+    
+    .datebuddy-object-card .slds-card__footer .slds-button {
+        width: 100%;
+        margin: var(--sds-c-spacing-xx-small) 0;
+    }
+}
+
+/* Accessibility improvements */
+.datebuddy-screen-reader-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Focus improvements for keyboard navigation */
+.datebuddy-object-card:focus-within {
+    outline: 2px solid var(--sds-c-color-border-brand);
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .datebuddy-object-card {
+        border-width: 2px;
+    }
+    
+    .datebuddy-object-card:hover {
+        border-color: var(--sds-c-color-border-brand);
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    .datebuddy-object-card {
+        transition: none;
+    }
+    
+    .datebuddy-object-card:hover {
+        transform: none;
+    }
+    
+    .datebuddy-object-card:active {
+        transform: none;
+    }
+}
