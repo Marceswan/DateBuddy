@@ -149,6 +149,7 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         const cacheKey = `fieldMappings_${objectApiName}`;
         if (this._fieldMappingsCache.has(cacheKey)) {
             const cachedData = this._fieldMappingsCache.get(cacheKey);
+            // Cached data is already processed
             this.treeData = cachedData.treeData;
             this.tableData = cachedData.tableData;
             return;
@@ -159,9 +160,56 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         try {
             const fieldMappings = await getObjectFieldMappings({ objectApiName });
             this.treeData = fieldMappings.treeNodes || [];
-            this.tableData = fieldMappings.mappingDetails || [];
             
-            // Cache the data
+            // Process mapping details to determine actual direction based on field configuration
+            this.tableData = (fieldMappings.mappingDetails || []).map(mapping => {
+                // Determine actual direction based on DateBuddyHandler logic:
+                // 1. If only Exit field present: ALWAYS "Exiting"
+                // 2. If only Entry field present + Direction is 'Exited'/'Exiting'/'Out': "Exiting"
+                // 3. Otherwise: "Entering"
+                
+                const hasEntryField = mapping.dateField && mapping.dateField.trim() !== '';
+                const hasExitField = mapping.exitDateField && mapping.exitDateField.trim() !== '';
+                
+                let actualDirection;
+                let displayDateField;
+                
+                if (hasExitField && !hasEntryField) {
+                    // Only Exit field present - ALWAYS show as Exiting
+                    actualDirection = 'Exiting';
+                    displayDateField = mapping.exitDateField;
+                } else if (hasEntryField && !hasExitField) {
+                    // Only Entry field present - check Direction
+                    // Support both old 'Exited' and new 'Exiting' values for compatibility
+                    if (mapping.direction === 'Exited' || mapping.direction === 'Exiting' || mapping.direction === 'Out') {
+                        actualDirection = 'Exiting';
+                    } else {
+                        actualDirection = 'Entering';
+                    }
+                    displayDateField = mapping.dateField;
+                } else if (hasEntryField && hasExitField) {
+                    // Both fields present - this shouldn't happen in single mapping
+                    // but handle gracefully - convert old values to new
+                    if (mapping.direction === 'Exited' || mapping.direction === 'Exiting' || mapping.direction === 'Out') {
+                        actualDirection = 'Exiting';
+                    } else {
+                        actualDirection = 'Entering';
+                    }
+                    displayDateField = mapping.dateField;
+                } else {
+                    // Neither field present - shouldn't happen but handle gracefully
+                    actualDirection = mapping.direction || 'Unknown';
+                    displayDateField = '';
+                }
+                
+                return {
+                    ...mapping,
+                    direction: actualDirection,
+                    dateField: displayDateField
+                };
+            });
+            
+            // Cache the processed data
             this._fieldMappingsCache.set(cacheKey, {
                 treeData: this.treeData,
                 tableData: this.tableData

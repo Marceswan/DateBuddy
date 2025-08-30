@@ -1,14 +1,14 @@
 # DateBuddy Project Documentation
 
 ## Project Overview
-DateBuddy is a Salesforce application that automatically stamps date fields when picklist values change, tracking both when values are "Entered" and "Exited".
+DateBuddy is a Salesforce application that automatically stamps date fields when picklist values change, tracking both when values are "Entering" and "Exiting".
 
 ## Key Implementation Details
 
 ### Trigger Context - CRITICAL
 - ALL DateBuddy triggers MUST run in BEFORE SAVE context (before insert, before update)
 - This ensures we capture ALL changes before they're committed to the database
-- Handles both "Entered" (value changes TO target) and "Exited" (value changes FROM target) scenarios
+- Handles both "Entering" (value changes TO target) and "Exiting" (value changes FROM target) scenarios
 
 ### Metadata Deployment Approach
 **IMPORTANT:** We use the JSZip method from apex-mdapi repository, NOT Zippex library.
@@ -30,16 +30,22 @@ Date_Stamp_Mapping__mdt fields:
 - `Picklist_Value__c` - Value to track
 - `Date_Field_API_Name__c` - Entry date field to stamp (Label: "Entry Date Field API Name")
 - `Exit_Date_Field_API_Name__c` - Exit date field to stamp (optional)
-- `Direction__c` - "Entered"/"Exited"/"In"/"Out" (optional, used when only one date field is populated)
+- `Direction__c` - "Entering"/"Exiting"/"Entered"/"Exited"/"In"/"Out" (optional, used when only one date field is populated)
+  - **Backward Compatibility**: System supports both old ("Entered"/"Exited") and new ("Entering"/"Exiting") Direction values
 
 ### Handler Logic
 DateBuddyHandler processes changes based on populated fields:
-1. **Both Entry & Exit fields present**: Entry field maps to "entered", Exit field maps to "exited"
+1. **Both Entry & Exit fields present**: Entry field maps to "entering", Exit field maps to "exiting"
 2. **Only Entry field present**:
-   - If Direction is "Exited"/"Out": Maps to exited tracking
-   - Otherwise: Maps to entered tracking (default)
-3. **Only Exit field present**: ALWAYS maps to exited tracking (Direction field is ignored)
-4. **Direction Support**: Accepts "Entered"/"Exited" and "In"/"Out" as equivalent values
+   - If Direction is "Exiting"/"Exited"/"Out": Maps to exiting tracking
+   - Otherwise: Maps to entering tracking (default)
+3. **Only Exit field present**: ALWAYS maps to exiting tracking (Direction field is ignored)
+4. **Direction Support**: Accepts "Entering"/"Exiting", "Entered"/"Exited", and "In"/"Out" as equivalent values
+
+### Client-Side Processing Optimization
+- **LWC Processing**: Direction determination and mapping classification is now handled client-side in the Lightning Web Component for improved performance
+- **Reduced Apex Processing**: The LWC processes mapping classification to reduce server-side Apex processing time
+- **Display Logic Fix**: DateBuddyDeployController display logic has been enhanced to properly handle mapping visualization
 
 ## Testing Requirements
 - Minimum code coverage: 90%

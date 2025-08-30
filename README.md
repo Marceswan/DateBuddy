@@ -5,22 +5,22 @@
 [![Code Coverage](https://img.shields.io/badge/Code%20Coverage-90%2B%25-brightgreen)](https://trailhead.salesforce.com/content/learn/modules/apex_testing)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Automated date field stamping for Salesforce - Track when picklist values are entered and exited with precision
+> Automated date field stamping for Salesforce - Track when picklist values are entering and exiting with precision
 
 ## 📋 Overview
 
-DateBuddy is a powerful Salesforce application that automatically stamps date fields when picklist values change. It provides comprehensive tracking of both when values are "Entered" (changed TO a target value) and "Exited" (changed FROM a target value), enabling precise audit trails and business process monitoring.
+DateBuddy is a powerful Salesforce application that automatically stamps date fields when picklist values change. It provides comprehensive tracking of both when values are "Entering" (changed TO a target value) and "Exiting" (changed FROM a target value), enabling precise audit trails and business process monitoring.
 
 The application uses Custom Metadata Types for configuration, making it highly flexible and admin-friendly without requiring code changes.
 
 ## ✨ Features
 
 - **🎯 Automatic Date Stamping**: Automatically populate date fields when picklist values change
-- **🔄 Bidirectional Tracking**: Track both "Entered" and "Exited" states for complete audit trails
+- **🔄 Bidirectional Tracking**: Track both "Entering" and "Exiting" states for complete audit trails
 - **⚙️ Metadata-Driven Configuration**: Easy setup through Custom Metadata Types (no code changes required)
 - **🚀 Dynamic Trigger Deployment**: Automatically generate and deploy triggers for configured objects
 - **📊 Lightning Web Component UI**: User-friendly interface for configuration and deployment
-- **🔧 Flexible Direction Mapping**: Support for "Entered"/"Exited" and "In"/"Out" direction values
+- **🔧 Flexible Direction Mapping**: Support for "Entering"/"Exiting" and "In"/"Out" direction values
 - **🔗 Flow-Compatible**: Includes invocable action for Flow Builder integration
 - **📦 2GP Package**: Easy installation via Second Generation Package
 
@@ -80,7 +80,7 @@ DateBuddy uses Custom Metadata Type records (`Date_Stamp_Mapping__mdt`) for conf
 | `Picklist_Value__c` | Specific picklist value to track (e.g., `Active`) | ✅ |
 | `Date_Field_API_Name__c` | Entry date field API name | ✅* |
 | `Exit_Date_Field_API_Name__c` | Exit date field API name | ❌ |
-| `Direction__c` | Direction when only one date field is used (`Entered`/`Exited`/`In`/`Out`) | ❌ |
+| `Direction__c` | Direction when only one date field is used (`Entering`/`Exiting`/`In`/`Out`) | ❌ |
 
 **\* Required unless `Exit_Date_Field_API_Name__c` is populated**
 
@@ -88,13 +88,15 @@ DateBuddy uses Custom Metadata Type records (`Date_Stamp_Mapping__mdt`) for conf
 
 Understanding how DateBuddy maps your configuration to date stamping behavior is crucial for proper setup. The system uses a sophisticated logic to determine when to stamp entry vs. exit dates based on which fields you populate.
 
+**Performance Note**: The Lightning Web Component (LWC) now processes direction determination client-side for improved performance, reducing server-side computation during record processing.
+
 ### Configuration Rules
 
 | Field Configuration | Behavior | Direction Field Effect |
 |-------------------|----------|----------------------|
 | **Both `Date_Field_API_Name__c` AND `Exit_Date_Field_API_Name__c` populated** | Entry field tracks ENTRY events<br/>Exit field tracks EXIT events | **IGNORED** - Two fields = bidirectional tracking |
-| **ONLY `Date_Field_API_Name__c` populated** | Default: Tracks ENTRY events<br/>Exception: If Direction = "Exited" or "Out" → Tracks EXIT events | **RESPECTED** - Determines tracking direction |
-| **ONLY `Exit_Date_Field_API_Name__c` populated** | Always tracks EXIT events | **IGNORED** - Exit field always means exit tracking |
+| **ONLY `Date_Field_API_Name__c` populated** | Default: Tracks ENTRY events<br/>Exception: If Direction = "Exiting" or "Out" → Tracks EXIT events | **RESPECTED** - Determines tracking direction |
+| **ONLY `Exit_Date_Field_API_Name__c` populated** | Always tracks EXIT events | **IGNORED** - Exit field ALWAYS maps to exiting behavior |
 
 ### Detailed Configuration Logic
 
@@ -115,7 +117,7 @@ When only the entry field is populated, DateBuddy defaults to entry tracking:
 ```
 Date_Field_API_Name__c: Status_Date__c          → Stamps when value ENTERS
 Exit_Date_Field_API_Name__c: [BLANK]            → Not used
-Direction__c: [BLANK/NULL/Entered/In]           → Entry tracking (default)
+Direction__c: [BLANK/NULL/Entering/In]          → Entry tracking (default)
 ```
 
 **Result**: Only entry events are tracked.
@@ -126,7 +128,7 @@ Use the Direction field to override default behavior for exit tracking:
 ```
 Date_Field_API_Name__c: Status_Date__c          → Stamps when value EXITS
 Exit_Date_Field_API_Name__c: [BLANK]            → Not used  
-Direction__c: Exited OR Out                     → Forces exit tracking
+Direction__c: Exiting OR Out                    → Forces exit tracking
 ```
 
 **Result**: Only exit events are tracked using the entry field.
@@ -146,8 +148,8 @@ Direction__c: [ANY VALUE]                       → IGNORED
 
 | Direction Value | Synonym | Behavior |
 |----------------|---------|----------|
-| `Entered` | `In` | Forces entry tracking when only one field is populated |
-| `Exited` | `Out` | Forces exit tracking when only one field is populated |
+| `Entering` | `In` | Forces entry tracking when only one field is populated |
+| `Exiting` | `Out` | Forces exit tracking when only one field is populated |
 | `null`/`blank` | - | Uses default behavior based on field configuration |
 
 ## 📚 Comprehensive Configuration Examples
@@ -179,7 +181,7 @@ Picklist_API_Name__c: StageName
 Picklist_Value__c: Closed Won
 Date_Field_API_Name__c: Closed_Won_Date__c
 Exit_Date_Field_API_Name__c: [Leave blank]
-Direction__c: Entered (or leave blank - default behavior)
+Direction__c: Entering (or leave blank - default behavior)
 ```
 
 **Behavior**:
@@ -196,7 +198,7 @@ Picklist_API_Name__c: Account_Status__c
 Picklist_Value__c: Qualification
 Date_Field_API_Name__c: Qualification_Left_Date__c
 Exit_Date_Field_API_Name__c: [Leave blank]
-Direction__c: Exited
+Direction__c: Exiting
 ```
 
 **Behavior**:
@@ -287,7 +289,7 @@ Date_Field_API_Name__c: Resolution_Date__c
    Picklist_Value__c: Prospecting
    Date_Field_API_Name__c: Prospecting_Date__c
    Exit_Date_Field_API_Name__c: [blank]
-   Direction__c: [blank - defaults to entry]
+   Direction__c: [blank - defaults to entering]
    ```
 
    **Record 2 - Qualification Entry**:
@@ -441,14 +443,14 @@ Date_Field_API_Name__c: Resolution_Date__c
 ```
 Date_Field_API_Name__c: Qualification_Date__c
 Exit_Date_Field_API_Name__c: [blank]
-Direction__c: [blank]  ← This defaults to ENTRY tracking
+Direction__c: [blank]  ← This defaults to ENTERING tracking
 ```
 
 ✅ **Correct Configuration**:
 ```  
 Date_Field_API_Name__c: Qualification_Date__c
 Exit_Date_Field_API_Name__c: [blank]
-Direction__c: Exited  ← Forces EXIT tracking
+Direction__c: Exiting  ← Forces EXIT tracking
 ```
 
 #### Issue 3: Multiple Mappings Causing Conflicts
@@ -483,8 +485,8 @@ Record 2: StageName = "Qualification" → Qualification_Date__c
 Record 1: Status = "Active" → Active_Start_Date__c + Active_End_Date__c (bidirectional)
 
 ❌ Invalid: Same value, same direction, different fields  
-Record 1: StageName = "Prospecting" → Date_Field_1__c (Direction: Entered)
-Record 2: StageName = "Prospecting" → Date_Field_2__c (Direction: Entered)
+Record 1: StageName = "Prospecting" → Date_Field_1__c (Direction: Entering)
+Record 2: StageName = "Prospecting" → Date_Field_2__c (Direction: Entering)
 ```
 
 #### Issue 4: Trigger Deployment Failures
@@ -663,7 +665,7 @@ To track when a Contact's Status changes to "Connected":
   - `Picklist_Value__c`: Value to track
   - `Date_Field_API_Name__c`: Entry date field
   - `Exit_Date_Field_API_Name__c`: Exit date field
-  - `Direction__c`: Direction indicator (Entered/Exited/In/Out)
+  - `Direction__c`: Direction indicator (Entering/Exiting/In/Out)
 
 #### Apex Classes
 - **DateBuddyHandler**: Core trigger handler for date stamping

@@ -84,6 +84,7 @@ public with sharing class DateBuddyDeployController {
         @AuraEnabled public String picklistField;
         @AuraEnabled public String picklistValue;
         @AuraEnabled public String dateField;
+        @AuraEnabled public String exitDateField; // Added to pass both fields to LWC
         @AuraEnabled public String direction;
         
         public MappingDetail() {
@@ -95,6 +96,16 @@ public with sharing class DateBuddyDeployController {
             this.picklistField = picklistField;
             this.picklistValue = picklistValue;
             this.dateField = dateField;
+            this.direction = direction;
+        }
+        
+        // New constructor that includes both date fields
+        public MappingDetail(String id, String picklistField, String picklistValue, String dateField, String exitDateField, String direction) {
+            this.id = id;
+            this.picklistField = picklistField;
+            this.picklistValue = picklistValue;
+            this.dateField = dateField;
+            this.exitDateField = exitDateField;
             this.direction = direction;
         }
     }
@@ -256,9 +267,9 @@ public with sharing class DateBuddyDeployController {
                 // If both entry and exit fields are populated, create two separate entries
                 if (hasEntryField && hasExitField) {
                     // Create Entry node
-                    String entryNodeName = picklistField + '_' + picklistValue + '_Entered';
+                    String entryNodeName = picklistField + '_' + picklistValue + '_Entering';
                     TreeNode entryNode = new TreeNode(
-                        picklistValue + ' (Entered)',
+                        picklistValue + ' (Entering)',
                         entryNodeName,
                         false
                     );
@@ -270,13 +281,13 @@ public with sharing class DateBuddyDeployController {
                         picklistField,
                         picklistValue,
                         dateField,
-                        'Entered'
+                        'Entering'
                     ));
                     
                     // Create Exit node
-                    String exitNodeName = picklistField + '_' + picklistValue + '_Exited';
+                    String exitNodeName = picklistField + '_' + picklistValue + '_Exiting';
                     TreeNode exitNode = new TreeNode(
-                        picklistValue + ' (Exited)',
+                        picklistValue + ' (Exiting)',
                         exitNodeName,
                         false
                     );
@@ -288,53 +299,28 @@ public with sharing class DateBuddyDeployController {
                         picklistField,
                         picklistValue,
                         exitDateField,
-                        'Exited'
+                        'Exiting'
                     ));
                 } else {
-                    // Single entry based on which field is populated and Direction__c
-                    String direction;
-                    String displayDateField;
-                    
-                    // Logic must match DateBuddyHandler.MappingConfig.addMapping():
-                    // 1. If only Exit field present: ALWAYS map to exited
-                    // 2. If only Entry field present + Direction is 'Exited'/'Out': map to exited
-                    // 3. Otherwise: map to entered (default)
-                    
-                    if (hasExitField && !hasEntryField) {
-                        // Only Exit field present - ALWAYS show as Exited
-                        direction = 'Exited';
-                        displayDateField = exitDateField;
-                    } else if (hasEntryField && !hasExitField) {
-                        // Only Entry field present - check Direction
-                        if (directionValue == 'Exited' || directionValue == 'Out') {
-                            direction = 'Exited';
-                        } else {
-                            direction = 'Entered';
-                        }
-                        displayDateField = dateField;
-                    } else {
-                        // Fallback (shouldn't happen but handle gracefully)
-                        direction = 'Entered';
-                        displayDateField = dateField;
-                    }
-                    
-                    // Create value node
-                    String valueNodeName = picklistField + '_' + picklistValue + '_' + direction;
-                    TreeNode valueNode = new TreeNode(
-                        picklistValue + ' (' + direction + ')',
-                        valueNodeName,
-                        false
-                    );
-                    picklistNode.items.add(valueNode);
-                    
-                    // Add to flat mapping details
+                    // Single mapping - pass raw data to LWC for classification
+                    // Use new constructor that includes both date fields
                     mappingDetails.add(new MappingDetail(
                         mapping.Id,
                         picklistField,
                         picklistValue,
-                        displayDateField,
-                        direction
+                        dateField,
+                        exitDateField,
+                        directionValue // Pass raw Direction__c value
                     ));
+                    
+                    // For tree view, still create a node but let LWC determine label
+                    String valueNodeName = picklistField + '_' + picklistValue + '_' + mapping.Id;
+                    TreeNode valueNode = new TreeNode(
+                        picklistValue, // Simple label, LWC will enhance
+                        valueNodeName,
+                        false
+                    );
+                    picklistNode.items.add(valueNode);
                 }
             }
             
