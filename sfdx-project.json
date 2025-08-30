@@ -1,12 +1,12 @@
 {
   "packageDirectories": [
     {
-      "versionName": "Version 1.1",
-      "versionNumber": "1.1.0.NEXT",
+      "versionName": "Version 1.2",
+      "versionNumber": "1.2.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "DateBuddy",
-      "versionDescription": "Automated date field stamping for Salesforce"
+      "versionDescription": "Enhanced UI with client-side processing and improved terminology"
     }
   ],
   "name": "DateBuddy",
@@ -16,6 +16,7 @@
   "packageAliases": {
     "DateBuddy": "0HoWs0000001qqzKAA",
     "DateBuddy@1.0.0-1": "04tWs000000aVzlIAE",
-    "DateBuddy@1.1.0-1": "04tWs000000aW1NIAU"
+    "DateBuddy@1.1.0-1": "04tWs000000aW1NIAU",
+    "DateBuddy@1.2.0-1": "04tWs000000aWKjIAM"
   }
 }

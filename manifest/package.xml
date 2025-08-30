@@ -8,11 +8,23 @@
         <members>UpdateDateFieldAction</members>
         <members>UpdateDateFieldActionTest</members>
         <members>MetadataServiceTest</members>
+        <members>RemoteSiteHelperController</members>
+        <members>RemoteSiteHelperTest</members>
+        <members>MetadataDataController</members>
+        <members>MetadataDeployController</members>
+        <members>MetadataRetrieveController</members>
+        <members>MetadataServiceExamples</members>
+        <members>MetadataServicePatcher</members>
         <name>ApexClass</name>
     </types>
     <types>
         <members>DateBuddySession</members>
         <members>DateBuddyDeploy</members>
+        <members>metadatabrowser</members>
+        <members>metadatadata</members>
+        <members>metadatadeploy</members>
+        <members>metadataretrieve</members>
+        <members>remotesitepage</members>
         <name>ApexPage</name>
     </types>
     <types>
@@ -43,6 +55,17 @@
         <members>extjs</members>
         <members>jsziplib</members>
         <name>StaticResource</name>
+    </types>
+    <types>
+        <members>MetadataBrowser</members>
+        <members>MetadataDeployDemo</members>
+        <members>MetadataRetrieveDemo</members>
+        <name>CustomTab</name>
+    </types>
+    <types>
+        <members>MetadataServicePatcher</members>
+        <members>MetadataServicePatcher/MetadataServicePatchedCopy</members>
+        <name>Document</name>
     </types>
     <version>64.0</version>
 </Package>

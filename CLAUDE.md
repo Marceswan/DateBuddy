@@ -78,11 +78,12 @@ DateBuddyHandler processes changes based on populated fields:
 - **API Version**: 64.0
 
 ### Current Version
-- **Version Number**: 1.1.0-1
-- **Subscriber Package Version ID**: 04tWs000000aW1NIAU
-- **Installation URL**: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU
+- **Version Number**: 1.2.0-1
+- **Subscriber Package Version ID**: 04tWs000000aWKjIAM
+- **Installation URL**: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aWKjIAM
 
 ### Version History
+- **1.2.0-1** (04tWs000000aWKjIAM) - Enhanced UI with client-side processing and improved terminology
 - **1.1.0-1** (04tWs000000aW1NIAU) - Added MetadataServiceTest class for improved test coverage
 - **1.0.0-1** (04tWs000000aVzlIAE) - Initial release with core DateBuddy functionality
 
@@ -92,7 +93,7 @@ DateBuddyHandler processes changes based on populated fields:
 sf package version create --package DateBuddy --installation-key-bypass --wait 20 --skip-validation
 
 # Install package
-sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG --wait 10
+sf package install --package 04tWs000000aWKjIAM --target-org YOUR_ORG --wait 10
 
 # List package versions
 sf package version list --package DateBuddy

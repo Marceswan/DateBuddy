@@ -330,7 +330,7 @@ public class UpdateDateFieldActionTest {
     @isTest
     static void testRealMetadataScenario() {
         // Test with actual existing metadata - Opportunity StageName = 'Needs Analysis'
-        Opportunity testOpp = [SELECT Id, StageName, Stage_Changed__c FROM Opportunity LIMIT 1];
+        Opportunity testOpp = [SELECT Id, StageName FROM Opportunity LIMIT 1];
         
         List<UpdateDateFieldAction.UpdateDateFieldRequest> requests = new List<UpdateDateFieldAction.UpdateDateFieldRequest>();
         
