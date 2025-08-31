@@ -4,7 +4,8 @@
 .datebuddy-object-card {
     cursor: pointer;
     transition: box-shadow 0.2s ease-in-out, transform 0.1s ease-in-out;
-    border: 1px solid var(--sds-c-card-color-border);
+    border: 1px solid var(--sds-c-card-color-border, rgb(221, 219, 218));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .datebuddy-object-card:hover {

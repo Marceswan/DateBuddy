@@ -2,19 +2,22 @@
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
         <members>DateBuddyDeployController</members>
+        <members>DateBuddyDeployControllerTest</members>
         <members>DateBuddyHandler</members>
+        <members>DateBuddyHandlerTest</members>
         <members>DateStampTriggerDeployer</members>
-        <members>MetadataService</members>
-        <members>UpdateDateFieldAction</members>
-        <members>UpdateDateFieldActionTest</members>
-        <members>MetadataServiceTest</members>
-        <members>RemoteSiteHelperController</members>
-        <members>RemoteSiteHelperTest</members>
+        <members>DateStampTriggerDeployerTest</members>
         <members>MetadataDataController</members>
         <members>MetadataDeployController</members>
         <members>MetadataRetrieveController</members>
+        <members>MetadataService</members>
         <members>MetadataServiceExamples</members>
         <members>MetadataServicePatcher</members>
+        <members>MetadataServiceTest</members>
+        <members>RemoteSiteHelperController</members>
+        <members>RemoteSiteHelperTest</members>
+        <members>UpdateDateFieldAction</members>
+        <members>UpdateDateFieldActionTest</members>
         <name>ApexClass</name>
     </types>
     <types>

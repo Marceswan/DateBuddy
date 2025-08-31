@@ -41,6 +41,12 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         { label: 'Direction', fieldName: 'direction', type: 'text' }
     ];
     
+    // Deployment status tracking
+    @track deploymentStatus = null;
+    @track showDeploymentStatus = false;
+    @track deploymentErrors = [];
+    @track deploymentTestFailures = [];
+    
     // Cache for performance
     _cardsCache = new Map();
     _fieldMappingsCache = new Map();
@@ -48,6 +54,132 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     async connectedCallback() {
         await this.loadCards();
         await this.loadLegacyOptions();
+        
+        // Listen for deployment status messages from VF page
+        window.addEventListener('message', this.handleDeploymentMessage.bind(this));
+    }
+    
+    disconnectedCallback() {
+        window.removeEventListener('message', this.handleDeploymentMessage.bind(this));
+    }
+    
+    handleDeploymentMessage(event) {
+        // Handle messages from the VF deployment page
+        if (event.data && event.data.type) {
+            if (event.data.type === 'deploymentStatus') {
+                this.updateDeploymentStatus(event.data.status);
+            } else if (event.data.type === 'deploymentComplete') {
+                this.handleDeploymentComplete(event.data.status);
+            }
+        }
+    }
+    
+    updateDeploymentStatus(status) {
+        this.deploymentStatus = status;
+        this.showDeploymentStatus = true;
+        
+        // Update the message with current status
+        if (status.numberComponentsTotal) {
+            this.message = `Deploying: ${status.numberComponentsDeployed || 0}/${status.numberComponentsTotal} components`;
+        }
+        if (status.numberTestsTotal) {
+            this.message += ` | Tests: ${status.numberTestsCompleted || 0}/${status.numberTestsTotal}`;
+            if (status.numberTestErrors) {
+                this.message += ` (${status.numberTestErrors} errors)`;
+            }
+        }
+    }
+    
+    handleDeploymentComplete(status) {
+        this.deploymentStatus = status;
+        this.showDeploymentStatus = true;
+        this.isBusy = false;
+        
+        // Store reference to deployment window if it exists
+        const deployWindow = this.deploymentWindow;
+        
+        if (status.status === 'Succeeded') {
+            this.message = 'Deployment successful!';
+            this.showToast('Success', 'Trigger deployed successfully', 'success');
+            // Refresh cards to show updated deployment status
+            this.loadCards();
+            
+            // Close the deployment window on success
+            if (deployWindow && !deployWindow.closed) {
+                setTimeout(() => {
+                    deployWindow.close();
+                }, 1500); // Give user a moment to see success message
+            }
+        } else {
+            this.message = 'Deployment failed. See errors below.';
+            this.processDeploymentErrors(status);
+            
+            // For failures, update the window with a message but don't close
+            if (deployWindow && !deployWindow.closed) {
+                try {
+                    // Try to update the window content with a user message
+                    const messageDiv = deployWindow.document.getElementById('deploymentProgress');
+                    if (messageDiv) {
+                        messageDiv.innerHTML += '<br/><br/><div style="padding: 10px; background: #f4f6f9; border-radius: 4px;">' +
+                            '<strong>Deployment failed.</strong><br/>' +
+                            'You can close this window when you\'re ready.<br/>' +
+                            'Error details are displayed in the main window.</div>';
+                    }
+                } catch (e) {
+                    // Cross-origin restrictions may prevent this, that's ok
+                }
+            }
+        }
+    }
+    
+    processDeploymentErrors(status) {
+        // Process component failures
+        if (status.componentFailures && status.componentFailures.length > 0) {
+            this.deploymentErrors = status.componentFailures.map(failure => ({
+                id: `error-${Math.random()}`,
+                fileName: failure.fileName || 'Unknown',
+                problem: failure.problem || 'Unknown error',
+                lineNumber: failure.lineNumber || '',
+                columnNumber: failure.columnNumber || ''
+            }));
+        }
+        
+        // Process test failures
+        if (status.testFailures && status.testFailures.length > 0) {
+            this.deploymentTestFailures = status.testFailures.map(failure => ({
+                id: `test-${Math.random()}`,
+                className: failure.name || 'Unknown',
+                methodName: failure.methodName || 'Unknown',
+                message: failure.message || 'Test failed',
+                stackTrace: failure.stackTrace || ''
+            }));
+            
+            // Check for validation rule conflicts
+            const hasValidationError = status.testFailures.some(failure => 
+                failure.message && failure.message.includes('FIELD_CUSTOM_VALIDATION_EXCEPTION')
+            );
+            
+            if (hasValidationError) {
+                this.showStickyToast(
+                    'Validation Rule Conflict', 
+                    'Validation Rule Conflict detected. Please disable the rule and try again.',
+                    'error'
+                );
+            }
+        }
+        
+        this.showToast('Deployment Failed', 'Check the error details below', 'error');
+    }
+    
+    showStickyToast(title, message, variant) {
+        this.dispatchEvent(
+            new ShowToastEvent({
+                title,
+                message,
+                variant,
+                mode: 'sticky' // User must dismiss manually
+            })
+        );
     }
 
     // New methods for enhanced UI
@@ -278,14 +410,35 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     get isViewSourceDisabled() {
         return this.isBusy || !this.objectApiName;
     }
+    
+    get hasDeploymentErrors() {
+        return this.deploymentErrors && this.deploymentErrors.length > 0;
+    }
+    
+    get hasTestFailures() {
+        return this.deploymentTestFailures && this.deploymentTestFailures.length > 0;
+    }
+    
+    get deploymentFailed() {
+        return this.deploymentStatus && this.deploymentStatus.status !== 'Succeeded';
+    }
 
     async deploy() {
         this.isBusy = true;
         this.message = '';
+        // Clear previous deployment status
+        this.deploymentStatus = null;
+        this.deploymentErrors = [];
+        this.deploymentTestFailures = [];
+        this.showDeploymentStatus = false;
+        
         try {
             // Open VF page in a new window for JSZip-based deployment
             const vfUrl = `/apex/DateBuddyDeploy?objectApiName=${encodeURIComponent(this.objectApiName)}`;
             const deployWindow = window.open(vfUrl, 'deployWindow', 'width=600,height=400');
+            
+            // Store window reference for later use
+            this.deploymentWindow = deployWindow;
             
             // Poll the VF page for deployment result
             this.message = 'Deployment window opened. Processing...';

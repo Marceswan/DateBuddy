@@ -21,7 +21,7 @@
             <div class="slds-grid slds-wrap slds-gutters">
                 <template for:each={cards} for:item="card">
                     <div key={card.objectApiName} 
-                         class="slds-col slds-size_1-of-3 slds-medium-size_1-of-2 slds-small-size_1-of-1 slds-m-bottom_medium">
+                         class="slds-col slds-size_1-of-4 slds-large-size_1-of-4 slds-medium-size_1-of-3 slds-small-size_1-of-2 slds-m-around_small">
                         <article class="slds-card datebuddy-object-card" 
                                  data-object={card.objectApiName} 
                                  onclick={handleCardClick}
@@ -123,6 +123,91 @@
                 <span class="slds-assistive-text">Info</span>
                 <lightning-icon icon-name="utility:info" size="small" class="slds-m-right_x-small"></lightning-icon>
                 {message}
+            </div>
+        </template>
+        
+        <!-- Deployment Error Details -->
+        <template if:true={deploymentFailed}>
+            <div class="slds-m-top_medium">
+                <!-- Component Failures Table -->
+                <template if:true={hasDeploymentErrors}>
+                    <div class="slds-box slds-theme_shade slds-m-bottom_medium">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">
+                            <lightning-icon icon-name="utility:error" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
+                            Component Failures
+                        </h3>
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="File Name">File Name</div>
+                                    </th>
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="Error Message">Error Message</div>
+                                    </th>
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="Line:Column">Line:Column</div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={deploymentErrors} for:item="error">
+                                    <tr key={error.id} class="slds-hint-parent">
+                                        <td data-label="File Name">
+                                            <div class="slds-truncate" title={error.fileName}>{error.fileName}</div>
+                                        </td>
+                                        <td data-label="Error Message">
+                                            <div class="slds-truncate" title={error.problem}>{error.problem}</div>
+                                        </td>
+                                        <td data-label="Line:Column">
+                                            <div class="slds-truncate">{error.lineNumber}:{error.columnNumber}</div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+                
+                <!-- Test Failures Table -->
+                <template if:true={hasTestFailures}>
+                    <div class="slds-box slds-theme_shade">
+                        <h3 class="slds-text-heading_small slds-m-bottom_small">
+                            <lightning-icon icon-name="utility:warning" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
+                            Apex Test Failures
+                        </h3>
+                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                            <thead>
+                                <tr class="slds-line-height_reset">
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="Class Name">Class Name</div>
+                                    </th>
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="Method Name">Method Name</div>
+                                    </th>
+                                    <th scope="col">
+                                        <div class="slds-truncate" title="Error Message">Error Message</div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template for:each={deploymentTestFailures} for:item="test">
+                                    <tr key={test.id} class="slds-hint-parent">
+                                        <td data-label="Class Name">
+                                            <div class="slds-truncate" title={test.className}>{test.className}</div>
+                                        </td>
+                                        <td data-label="Method Name">
+                                            <div class="slds-truncate" title={test.methodName}>{test.methodName}</div>
+                                        </td>
+                                        <td data-label="Error Message">
+                                            <div title={test.message}>{test.message}</div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
             </div>
         </template>
         
