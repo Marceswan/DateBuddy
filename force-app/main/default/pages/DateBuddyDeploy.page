@@ -5,49 +5,25 @@
         // Global variable to store deployment result
         window.deploymentResult = null;
         
-        function createTriggerZip(objectApiName, triggerName, triggerSource, testClassName, testClassSource) {
+        function createFullDeploymentZip(objectApiName, packageData) {
             try {
                 var zip = new JSZip();
                 
-                // Create package.xml
-                var packageXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-                    '<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
-                    '    <types>\n' +
-                    '        <members>' + triggerName + '</members>\n' +
-                    '        <name>ApexTrigger</name>\n' +
-                    '    </types>\n' +
-                    '    <types>\n' +
-                    '        <members>' + testClassName + '</members>\n' +
-                    '        <name>ApexClass</name>\n' +
-                    '    </types>\n' +
-                    '    <version>64.0</version>\n' +
-                    '</Package>';
+                // Add package.xml from server
+                zip.file("package.xml", packageData.packageXml);
                 
-                // Create trigger meta.xml
-                var triggerMetaXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-                    '<ApexTrigger xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
-                    '    <apiVersion>64.0</apiVersion>\n' +
-                    '    <status>Active</status>\n' +
-                    '</ApexTrigger>';
+                // Add trigger files
+                zip.folder("triggers").file(packageData.triggerName + ".trigger", packageData.triggerSource);
+                zip.folder("triggers").file(packageData.triggerName + ".trigger-meta.xml", packageData.triggerMetadata);
                 
-                // Create test class meta.xml
-                var testClassMetaXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
-                    '<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
-                    '    <apiVersion>64.0</apiVersion>\n' +
-                    '    <status>Active</status>\n' +
-                    '</ApexClass>';
-                
-                // Add files to ZIP
-                zip.file("package.xml", packageXml);
-                zip.folder("triggers").file(triggerName + ".trigger", triggerSource);
-                zip.folder("triggers").file(triggerName + ".trigger-meta.xml", triggerMetaXml);
-                zip.folder("classes").file(testClassName + ".cls", testClassSource);
-                zip.folder("classes").file(testClassName + ".cls-meta.xml", testClassMetaXml);
+                // Add test class files
+                zip.folder("classes").file(packageData.testClassName + ".cls", packageData.testClassSource);
+                zip.folder("classes").file(packageData.testClassName + ".cls-meta.xml", packageData.testClassMetadata);
                 
                 // Generate base64 ZIP
                 return zip.generateAsync({type: "base64"})
                     .then(function(base64) {
-                        return deployTriggerZip(base64, testClassName, triggerName);
+                        return deployTriggerZip(base64, packageData.testClassName, packageData.triggerName);
                     });
             } catch(e) {
                 console.error('Error creating ZIP:', e);
@@ -65,18 +41,14 @@
                     '{!$RemoteAction.DateStampTriggerDeployer.deployZip}',
                     base64Zip,
                     testClassName,
-                    triggerName,  // Use trigger name as deployment name
+                    triggerName,
                     function(result, event) {
                         if (event.status) {
                             window.deploymentResult = {
                                 success: true,
                                 asyncResultId: result,
-                                deploymentId: result  // Store deployment ID for status checking
+                                deploymentId: result
                             };
-                            // Start polling for deployment status
-                            if (result) {
-                                pollDeploymentStatus(result);
-                            }
                             resolve(result);
                         } else {
                             window.deploymentResult = {
@@ -94,13 +66,13 @@
         // Function to be called from LWC or external context
         window.deployTrigger = function(objectApiName) {
             return new Promise(function(resolve, reject) {
-                // Get trigger details from controller
+                // Get complete deployment package including test class
                 Visualforce.remoting.Manager.invokeAction(
-                    '{!$RemoteAction.DateStampTriggerDeployer.getTriggerDetails}',
+                    '{!$RemoteAction.DateStampTriggerDeployer.prepareDeploymentPackage}',
                     objectApiName,
                     function(result, event) {
                         if (event.status && result) {
-                            createTriggerZip(objectApiName, result.triggerName, result.triggerSource, result.testClassName, result.testClassSource)
+                            createFullDeploymentZip(objectApiName, result)
                                 .then(function(asyncResultId) {
                                     resolve(asyncResultId);
                                 })
@@ -110,9 +82,9 @@
                         } else {
                             window.deploymentResult = {
                                 success: false,
-                                error: event.message || 'Failed to get trigger details'
+                                error: event.message || 'Failed to get deployment package'
                             };
-                            reject(new Error(event.message || 'Failed to get trigger details'));
+                            reject(new Error(event.message || 'Failed to get deployment package'));
                         }
                     },
                     {escape: false}
@@ -137,162 +109,348 @@
                 );
             });
         };
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Salesforce Sans', Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+        #status {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h2 {
+            color: #032e61;
+            margin-top: 0;
+            font-size: 20px;
+            font-weight: 300;
+        }
+        #message {
+            color: #16325c;
+            margin: 16px 0;
+        }
+        .progress-container {
+            margin: 20px 0;
+            background: #ecebea;
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar {
+            background: #0070d2;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+        .status-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            font-size: 14px;
+            color: #54698d;
+        }
+        .test-results {
+            margin-top: 24px;
+            border: 1px solid #dddbda;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .test-results table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .test-results th {
+            background: #f4f6f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #032e61;
+            border-bottom: 1px solid #dddbda;
+        }
+        .test-results td {
+            padding: 12px;
+            border-bottom: 1px solid #ecebea;
+        }
+        .test-pass {
+            color: #04844b;
+            font-weight: 600;
+        }
+        .test-fail {
+            color: #c23934;
+            font-weight: 600;
+        }
+        .error-message {
+            background: #fef1f1;
+            border-left: 4px solid #c23934;
+            padding: 12px;
+            margin: 16px 0;
+            border-radius: 4px;
+        }
+        .success-message {
+            background: #ebf7ed;
+            border-left: 4px solid #04844b;
+            padding: 12px;
+            margin: 16px 0;
+            border-radius: 4px;
+            color: #032e61;
+        }
+        .sticky-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #c23934;
+            color: white;
+            padding: 16px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            max-width: 400px;
+            display: none;
+        }
+        .sticky-toast.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+        .sticky-toast .close-btn {
+            float: right;
+            cursor: pointer;
+            margin-left: 12px;
+            font-size: 20px;
+            line-height: 1;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .close-message {
+            background: #f4f6f9;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 16px;
+            text-align: center;
+            color: #54698d;
+        }
+    </style>
+    
+    <div id="status">
+        <h2>DateBuddy Trigger Deployment</h2>
+        <div id="message">Initializing...</div>
+        <div id="progressContainer" style="display: none;">
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="status-info">
+                <span id="deployStatus">Starting deployment...</span>
+                <span id="componentProgress">0 / 0 components</span>
+            </div>
+        </div>
+        <div id="testResultsContainer" style="display: none;">
+            <div class="test-results">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Test Class</th>
+                            <th>Method</th>
+                            <th>Status</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="testResultsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div id="errorContainer" style="display: none;">
+        </div>
+    </div>
+    
+    <div class="sticky-toast" id="validationToast">
+        <span class="close-btn" onclick="closeToast()">×</span>
+        <strong>Validation Rule Conflict Detected</strong><br/>
+        Please disable the validation rule and try again.
+    </div>
+    
+    <script>
+        var pollingInterval;
+        var deploymentStartTime;
         
-        // Function to poll deployment status
-        window.pollDeploymentStatus = function(deploymentId, onStatusUpdate) {
-            var pollInterval = 2000; // Poll every 2 seconds
-            var maxPolls = 60; // Max 2 minutes of polling
-            var pollCount = 0;
+        function closeToast() {
+            document.getElementById('validationToast').classList.remove('show');
+        }
+        
+        function updateProgressBar(deployed, total) {
+            var percentage = total > 0 ? (deployed / total) * 100 : 0;
+            document.getElementById('progressBar').style.width = percentage + '%';
+            document.getElementById('componentProgress').textContent = deployed + ' / ' + total + ' components';
+        }
+        
+        function displayTestResults(testResults) {
+            if (!testResults || testResults.length === 0) return;
             
-            function checkStatus() {
-                window.checkDeploymentStatus(deploymentId)
+            document.getElementById('testResultsContainer').style.display = 'block';
+            var tbody = document.getElementById('testResultsBody');
+            tbody.innerHTML = '';
+            
+            testResults.forEach(function(test) {
+                var row = tbody.insertRow();
+                row.insertCell(0).textContent = test.className || test.name || 'Unknown';
+                row.insertCell(1).textContent = test.methodName || 'Unknown';
+                
+                var statusCell = row.insertCell(2);
+                var outcome = test.outcome || (test.success ? 'Pass' : 'Fail');
+                statusCell.textContent = outcome;
+                statusCell.className = outcome === 'Pass' ? 'test-pass' : 'test-fail';
+                
+                row.insertCell(3).textContent = test.message || '';
+                
+                // Check for validation rule conflicts
+                if (test.message && test.message.indexOf('FIELD_CUSTOM_VALIDATION_EXCEPTION') !== -1) {
+                    document.getElementById('validationToast').classList.add('show');
+                }
+            });
+        }
+        
+        function displayErrors(errors) {
+            if (!errors || errors.length === 0) return;
+            
+            var errorContainer = document.getElementById('errorContainer');
+            errorContainer.style.display = 'block';
+            errorContainer.innerHTML = '';
+            
+            errors.forEach(function(error) {
+                var errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                var errorText = '';
+                if (typeof error === 'object') {
+                    errorText = (error.fileName || '') + ': ' + (error.problem || error.message || JSON.stringify(error));
+                } else {
+                    errorText = error;
+                }
+                errorDiv.textContent = errorText;
+                errorContainer.appendChild(errorDiv);
+            });
+        }
+        
+        function pollDeploymentStatus(asyncResultId) {
+            document.getElementById('progressContainer').style.display = 'block';
+            deploymentStartTime = Date.now();
+            
+            pollingInterval = setInterval(function() {
+                window.checkDeploymentStatus(asyncResultId)
                     .then(function(result) {
-                        // Call the status update callback if provided
-                        if (onStatusUpdate) {
-                            onStatusUpdate(result);
-                        }
-                        
-                        // Update deployment result
-                        window.deploymentResult = window.deploymentResult || {};
-                        window.deploymentResult.status = result;
-                        window.deploymentResult.lastChecked = new Date();
+                        // Update progress
+                        updateProgressBar(result.numberComponentsDeployed || 0, result.numberComponentsTotal || 0);
+                        document.getElementById('deployStatus').textContent = 
+                            'Status: ' + (result.status || 'Processing');
                         
                         // Notify parent window (LWC) of status update
                         if (window.parent && window.parent !== window) {
                             window.parent.postMessage({
                                 type: 'deploymentStatus',
-                                deploymentId: deploymentId,
+                                deploymentId: asyncResultId,
                                 status: result
                             }, '*');
                         }
                         
-                        // Continue polling if not done
-                        if (!result.done && pollCount < maxPolls) {
-                            pollCount++;
-                            setTimeout(checkStatus, pollInterval);
-                        } else if (result.done) {
-                            // Final status update
-                            window.deploymentResult.completed = true;
-                            window.deploymentResult.finalStatus = result.status;
+                        // Check if deployment is done
+                        if (result.done) {
+                            clearInterval(pollingInterval);
                             
-                            // Send final notification
+                            // Display test results
+                            if (result.testFailures && result.testFailures.length > 0) {
+                                displayTestResults(result.testFailures);
+                            }
+                            
+                            // Display component errors
+                            if (result.componentFailures && result.componentFailures.length > 0) {
+                                displayErrors(result.componentFailures);
+                            }
+                            
+                            // Send final notification to parent
                             if (window.parent && window.parent !== window) {
                                 window.parent.postMessage({
                                     type: 'deploymentComplete',
-                                    deploymentId: deploymentId,
+                                    deploymentId: asyncResultId,
                                     status: result
                                 }, '*');
+                            }
+                            
+                            // Handle completion
+                            if (result.status === 'Succeeded') {
+                                var successDiv = document.createElement('div');
+                                successDiv.className = 'success-message';
+                                successDiv.innerHTML = '<strong>✓ Deployment Successful!</strong><br/>All components deployed successfully.';
+                                document.getElementById('message').appendChild(successDiv);
+                                
+                                // Show auto-close notice
+                                var closeNotice = document.createElement('div');
+                                closeNotice.className = 'close-message';
+                                closeNotice.innerHTML = 'This window will close automatically in a moment...';
+                                document.getElementById('message').appendChild(closeNotice);
+                                
+                                // Auto-close after 2 seconds only on success
+                                setTimeout(function() {
+                                    window.close();
+                                }, 2000);
+                            } else if (result.status === 'Failed' || result.status === 'Canceled') {
+                                // For failed or canceled deployments, show message but don't auto-close
+                                var closeDiv = document.createElement('div');
+                                closeDiv.className = 'close-message';
+                                closeDiv.innerHTML = 'Deployment ' + result.status.toLowerCase() + '. You can close this window when you are ready.';
+                                document.getElementById('message').appendChild(closeDiv);
+                                
+                                // Set error result for parent window
+                                window.deploymentResult = {
+                                    success: false,
+                                    error: 'Deployment ' + result.status
+                                };
                             }
                         }
                     })
                     .catch(function(error) {
-                        // Error checking status, retry if not at max
-                        if (pollCount < maxPolls) {
-                            pollCount++;
-                            setTimeout(checkStatus, pollInterval * 2); // Longer delay on error
-                        }
+                        // Error checking status, retry
+                        console.error('Error checking status:', error);
                     });
-            }
-            
-            // Start polling after a short delay
-            setTimeout(checkStatus, 1000);
-            return deploymentId;
-        };
-    </script>
-    
-    <div id="status" style="padding: 20px; font-family: Arial, sans-serif;">
-        <h2>DateBuddy Trigger Deployment</h2>
-        <div id="message">Initializing...</div>
-    </div>
-    
-    <script>
+            }, 2000); // Poll every 2 seconds
+        }
+        
         // Auto-deploy if objectApiName is provided in URL
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
             const objectApiName = urlParams.get('objectApiName');
             
             if (objectApiName) {
-                document.getElementById('message').innerHTML = 'Deploying trigger for: ' + objectApiName;
+                document.getElementById('message').innerHTML = '<strong>Deploying trigger for:</strong> ' + objectApiName;
                 
                 window.deployTrigger(objectApiName)
                     .then(function(asyncResultId) {
                         document.getElementById('message').innerHTML = 
-                            'Deployment initiated!<br/>AsyncResult ID: ' + asyncResultId + '<br/><br/>' +
-                            '<div id="deploymentProgress">Checking deployment status...</div>';
+                            '<strong>Deployment initiated</strong><br/>Tracking deployment progress...';
+                        
+                        // Start polling for status
+                        pollDeploymentStatus(asyncResultId);
                         
                         // Set result for parent window
                         window.deploymentResult = {
                             success: true,
                             asyncResultId: asyncResultId
                         };
-                        
-                        // Start polling for status with UI updates
-                        window.pollDeploymentStatus(asyncResultId, function(status) {
-                            var progressDiv = document.getElementById('deploymentProgress');
-                            if (progressDiv) {
-                                var statusHtml = '<strong>Status:</strong> ' + (status.status || 'Pending') + '<br/>';
-                                
-                                if (status.numberComponentsTotal) {
-                                    statusHtml += '<strong>Components:</strong> ' + 
-                                        (status.numberComponentsDeployed || 0) + '/' + 
-                                        status.numberComponentsTotal + '<br/>';
-                                }
-                                
-                                if (status.numberTestsTotal) {
-                                    statusHtml += '<strong>Tests:</strong> ' + 
-                                        (status.numberTestsCompleted || 0) + '/' + 
-                                        status.numberTestsTotal;
-                                    if (status.numberTestErrors) {
-                                        statusHtml += ' <span style="color: red;">(' + 
-                                            status.numberTestErrors + ' errors)</span>';
-                                    }
-                                    statusHtml += '<br/>';
-                                }
-                                
-                                if (status.testFailures && status.testFailures.length > 0) {
-                                    statusHtml += '<br/><strong style="color: red;">Test Failures:</strong><ul>';
-                                    status.testFailures.forEach(function(failure) {
-                                        statusHtml += '<li>' + failure.name + '.' + failure.methodName + 
-                                            ': ' + failure.message + '</li>';
-                                    });
-                                    statusHtml += '</ul>';
-                                }
-                                
-                                if (status.componentFailures && status.componentFailures.length > 0) {
-                                    statusHtml += '<br/><strong style="color: red;">Component Failures:</strong><ul>';
-                                    status.componentFailures.forEach(function(failure) {
-                                        statusHtml += '<li>' + failure.fileName + ': ' + 
-                                            failure.problem + '</li>';
-                                    });
-                                    statusHtml += '</ul>';
-                                }
-                                
-                                if (status.done) {
-                                    if (status.status === 'Succeeded') {
-                                        statusHtml = '<span style="color: green; font-size: 1.2em; font-weight: bold;">✓ Deployment Successful!</span><br/>' + statusHtml;
-                                        // Show success message with auto-close notice
-                                        statusHtml += '<br/><div style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-top: 10px; color: #155724;">' +
-                                            '<strong>Success!</strong> Trigger deployed successfully.<br/>' +
-                                            'This window will close automatically in a moment...</div>';
-                                        // Auto-close window after showing success message
-                                        setTimeout(function() {
-                                            window.close();
-                                        }, 2000);
-                                    } else {
-                                        statusHtml = '<span style="color: red;">✗ Deployment Failed</span><br/>' + statusHtml;
-                                        statusHtml += '<br/><div style="padding: 10px; background: #f4f6f9; border-radius: 4px; margin-top: 10px;">' +
-                                            '<strong>You can close this window when you\'re ready.</strong><br/>' +
-                                            'Error details are displayed in the main window.</div>';
-                                    }
-                                }
-                                
-                                progressDiv.innerHTML = statusHtml;
-                            }
-                        });
                     })
                     .catch(function(error) {
-                        document.getElementById('message').innerHTML = 
-                            'Deployment failed: ' + error.message;
+                        document.getElementById('message').innerHTML = '';
+                        var errorDiv = document.createElement('div');
+                        errorDiv.className = 'error-message';
+                        errorDiv.innerHTML = '<strong>Deployment failed:</strong> ' + error.message;
+                        document.getElementById('message').appendChild(errorDiv);
                         
                         // Set error result for parent window
                         window.deploymentResult = {

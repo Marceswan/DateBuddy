@@ -19,6 +19,7 @@ public with sharing class DateBuddyDeployController {
         @AuraEnabled public Integer entryMappings;
         @AuraEnabled public Integer exitMappings;
         @AuraEnabled public Integer fieldCount;
+        @AuraEnabled public Boolean hasDeployedTrigger;
         
         public ObjectCardWrapper() {
             // Default constructor for test instantiation
@@ -30,6 +31,16 @@ public with sharing class DateBuddyDeployController {
             this.entryMappings = entryMappings;
             this.exitMappings = exitMappings;
             this.fieldCount = fieldCount;
+            this.hasDeployedTrigger = false;
+        }
+        
+        public ObjectCardWrapper(String objectName, Integer totalMappings, Integer entryMappings, Integer exitMappings, Integer fieldCount, Boolean hasDeployedTrigger) {
+            this.objectName = objectName;
+            this.totalMappings = totalMappings;
+            this.entryMappings = entryMappings;
+            this.exitMappings = exitMappings;
+            this.fieldCount = fieldCount;
+            this.hasDeployedTrigger = hasDeployedTrigger;
         }
     }
 
@@ -110,6 +121,31 @@ public with sharing class DateBuddyDeployController {
         }
     }
 
+    /**
+     * Checks if a trigger exists for the given object
+     * Uses the expected trigger naming convention: DateStamp_{ObjectName}_BT
+     */
+    private static Boolean checkTriggerExists(String objectApiName) {
+        try {
+            // Expected trigger name based on DateStampTriggerDeployer convention
+            String expectedTriggerName = 'DateStamp_' + objectApiName + '_BT';
+            
+            // Query ApexTrigger to check if the trigger exists
+            List<ApexTrigger> triggers = [
+                SELECT Id, Name 
+                FROM ApexTrigger 
+                WHERE Name = :expectedTriggerName
+                AND Status = 'Active'
+                LIMIT 1
+            ];
+            
+            return !triggers.isEmpty();
+        } catch (Exception e) {
+            // If we can't query triggers (permissions issue), assume not deployed
+            return false;
+        }
+    }
+    
     /**
      * Returns a list of objects with their statistics including field count and trigger deployment status.
      * Uses efficient SOQL with aggregation to minimize queries and provide optimal performance.
@@ -201,12 +237,16 @@ public with sharing class DateBuddyDeployController {
                 Integer entryMappings = objectToEntryCount.get(objectApiName);
                 Integer exitMappings = objectToExitCount.get(objectApiName);
                 
+                // Check if trigger is deployed
+                Boolean hasDeployedTrigger = checkTriggerExists(objectApiName);
+                
                 results.add(new ObjectCardWrapper(
                     objectApiName, 
                     totalMappings, 
                     entryMappings, 
                     exitMappings, 
-                    fieldCount
+                    fieldCount,
+                    hasDeployedTrigger
                 ));
             }
             

@@ -93,6 +93,7 @@ public without sharing class DateStampTriggerDeployer {
      * @param objectApiName The object to create trigger for
      * @return Map containing package components (packageXml, triggerSource, triggerMetadata, testClass, testClassMetadata)
      */
+    @RemoteAction
     public static Map<String, String> prepareDeploymentPackage(String objectApiName) {
         String triggerName = generateTriggerName(objectApiName);
         String testClassName = generateTestClassName(objectApiName);
