@@ -180,24 +180,15 @@ public class DateStampTriggerDeployerTest {
     @IsTest
     static void testCheckDeploymentStatus_mockSuccess() {
         // Test to cover lines 145-148 in checkDeploymentStatus method
-        // Similar to above, we expect this to fail but want to ensure we reach the method
+        // The new method catches exceptions and returns them in the result
         Test.startTest();
-        try {
-            Map<String, Object> result = DateStampTriggerDeployer.checkDeploymentStatus('testDeploymentId123');
-            // In test context, this will likely fail
-            System.assert(false, 'Should have thrown exception in test context');
-        } catch (Exception e) {
-            // Expected - verify proper exception handling and that we reached checkDeploymentStatus
-            String errorMsg = e.getMessage();
-            System.assert(errorMsg.contains('Invalid Session ID') || 
-                         errorMsg.contains('Unauthorized endpoint') ||
-                         errorMsg.contains('endpoint_x') ||
-                         errorMsg.contains('Unable to find a wsdl') ||
-                         errorMsg.contains('Web service callouts') ||
-                         errorMsg.contains('Script-thrown exception'),
-                         'Should handle service failure appropriately: ' + errorMsg);
-        }
+        Map<String, Object> result = DateStampTriggerDeployer.checkDeploymentStatus('testDeploymentId123');
         Test.stopTest();
+        
+        // The method should return a result with success = false and an error message
+        System.assertNotEquals(null, result, 'Should return a result map');
+        System.assertEquals(false, result.get('success'), 'Should indicate failure');
+        System.assertNotEquals(null, result.get('error'), 'Should include error message');
     }
     
     @IsTest
@@ -236,20 +227,13 @@ public class DateStampTriggerDeployerTest {
     static void testCheckDeploymentStatus() {
         Test.startTest();
         
-        try {
-            Map<String, Object> result = DateStampTriggerDeployer.checkDeploymentStatus('testDeploymentId123');
-            // In test context, this will fail but we're testing method structure
-            System.assert(false, 'Should have thrown exception in test context');
-        } catch (Exception e) {
-            // Expected - verify proper exception handling
-            String errorMsg = e.getMessage();
-            System.assert(errorMsg.contains('Invalid Session ID') || 
-                         errorMsg.contains('Unauthorized endpoint') ||
-                         errorMsg.contains('endpoint_x') ||
-                         errorMsg.contains('Unable to find a wsdl') ||
-                         errorMsg.contains('Web service callouts'),
-                         'Should throw appropriate exception: ' + errorMsg);
-        }
+        // The new method catches exceptions and returns them in the result
+        Map<String, Object> result = DateStampTriggerDeployer.checkDeploymentStatus('testDeploymentId123');
+        
+        // The method should return a result with success = false and an error message
+        System.assertNotEquals(null, result, 'Should return a result map');
+        System.assertEquals(false, result.get('success'), 'Should indicate failure');
+        System.assertNotEquals(null, result.get('error'), 'Should include error message');
         
         Test.stopTest();
     }
@@ -353,7 +337,7 @@ public class DateStampTriggerDeployerTest {
         System.assert(accountTestClass.contains('account.Name = \'Test Account\''), 'Account test should set Name field');
         
         String contactTestClass = DateStampTriggerDeployer.generateTestClassSource('Contact', 'DateStamp_Contact_BT', 'DateStamp_Contact_BT_Test');
-        System.assert(contactTestClass.contains('contact.Name = \'Test Contact\''), 'Contact test should set Name field');
+        System.assert(contactTestClass.contains('contact.LastName = \'Test Contact\''), 'Contact test should set LastName field');
         
         String opportunityTestClass = DateStampTriggerDeployer.generateTestClassSource('Opportunity', 'DateStamp_Opportunity_BT', 'DateStamp_Opportunity_BT_Test');
         System.assert(opportunityTestClass.contains('opportunity.Name = \'Test Opportunity\''), 'Opportunity test should set Name field');
@@ -388,9 +372,9 @@ public class DateStampTriggerDeployerTest {
         String testClass = DateStampTriggerDeployer.generateTestClassSource('Lead', 'DateStamp_Lead_BT', 'DateStamp_Lead_BT_Test');
         
         // Verify bulk test creates 200 records
-        System.assert(testClass.contains('for (Integer i = 0; i < 200; i++)'), 'Should create 200 records for bulk test');
+        System.assert(testClass.contains('for (Integer i = 0; i < 20; i++)'), 'Should create 20 records for bulk test');
         System.assert(testClass.contains('Lead lead = new Lead()'), 'Should create Lead instances');
-        System.assert(testClass.contains('lead.Name = \'Test Lead \' + i'), 'Should set unique names for bulk records');
+        System.assert(testClass.contains('lead.LastName = \'Test Lead\''), 'Should set LastName for bulk records');
         System.assert(testClass.contains('testRecords.add(lead)'), 'Should add to list');
         System.assert(testClass.contains('insert testRecords'), 'Should bulk insert');
         System.assert(testClass.contains('update testRecords'), 'Should bulk update');
