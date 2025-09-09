@@ -1,8 +1,8 @@
 {
   "packageDirectories": [
     {
-      "versionName": "Version 1.1 (Winter '26)",
-      "versionNumber": "1.2.0.NEXT",
+      "versionName": "Version 1.5 (Winter '26)",
+      "versionNumber": "1.5.0.NEXT",
       "path": "force-app",
       "default": true,
       "package": "DateBuddy",
