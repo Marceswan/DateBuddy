@@ -1,4 +1,8 @@
 public with sharing class DateBuddyDeployController {
+    @TestVisible private static List<Date_Stamp_Mapping__mdt> mockMappings;
+    @TestVisible private static Boolean mockTriggerExists = false;
+    @TestVisible private static Boolean forceMetadataServiceException = false;
+    
     /**
      * DTO returned to LWC for async status.
      */
@@ -11,6 +15,52 @@ public with sharing class DateBuddyDeployController {
     }
 
     /**
+     * Enhanced deployment status with test results
+     */
+    public class DeploymentStatusWrapper {
+        @AuraEnabled public String id;
+        @AuraEnabled public String status;
+        @AuraEnabled public Boolean done;
+        @AuraEnabled public Integer numberComponentsDeployed;
+        @AuraEnabled public Integer numberComponentsTotal;
+        @AuraEnabled public Integer numberComponentErrors;
+        @AuraEnabled public Integer numberTestsCompleted;
+        @AuraEnabled public Integer numberTestsTotal;
+        @AuraEnabled public Integer numberTestErrors;
+        @AuraEnabled public List<TestResult> testResults;
+        @AuraEnabled public List<String> componentErrors;
+        @AuraEnabled public String deployedByName;
+        @AuraEnabled public DateTime startTime;
+        @AuraEnabled public DateTime endTime;
+        
+        public DeploymentStatusWrapper() {
+            this.testResults = new List<TestResult>();
+            this.componentErrors = new List<String>();
+        }
+    }
+
+    /**
+     * Test execution result details
+     */
+    public class TestResult {
+        @AuraEnabled public String className;
+        @AuraEnabled public String methodName;
+        @AuraEnabled public String outcome;
+        @AuraEnabled public String message;
+        @AuraEnabled public String stackTrace;
+        @AuraEnabled public Double executionTime;
+        
+        public TestResult() {}
+        
+        public TestResult(String className, String methodName, String outcome, String message) {
+            this.className = className;
+            this.methodName = methodName;
+            this.outcome = outcome;
+            this.message = message;
+        }
+    }
+
+    /**
      * Wrapper class for object card information.
      */
     public class ObjectCardWrapper {
@@ -19,10 +69,11 @@ public with sharing class DateBuddyDeployController {
         @AuraEnabled public Integer entryMappings;
         @AuraEnabled public Integer exitMappings;
         @AuraEnabled public Integer fieldCount;
-        @AuraEnabled public Boolean hasDeployedTrigger;
+        @AuraEnabled public Boolean isDeployed;
         
         public ObjectCardWrapper() {
             // Default constructor for test instantiation
+            this.isDeployed = false;
         }
 
         public ObjectCardWrapper(String objectName, Integer totalMappings, Integer entryMappings, Integer exitMappings, Integer fieldCount) {
@@ -31,16 +82,16 @@ public with sharing class DateBuddyDeployController {
             this.entryMappings = entryMappings;
             this.exitMappings = exitMappings;
             this.fieldCount = fieldCount;
-            this.hasDeployedTrigger = false;
+            this.isDeployed = false;
         }
         
-        public ObjectCardWrapper(String objectName, Integer totalMappings, Integer entryMappings, Integer exitMappings, Integer fieldCount, Boolean hasDeployedTrigger) {
+        public ObjectCardWrapper(String objectName, Integer totalMappings, Integer entryMappings, Integer exitMappings, Integer fieldCount, Boolean isDeployed) {
             this.objectName = objectName;
             this.totalMappings = totalMappings;
             this.entryMappings = entryMappings;
             this.exitMappings = exitMappings;
             this.fieldCount = fieldCount;
-            this.hasDeployedTrigger = hasDeployedTrigger;
+            this.isDeployed = isDeployed;
         }
     }
 
@@ -122,31 +173,6 @@ public with sharing class DateBuddyDeployController {
     }
 
     /**
-     * Checks if a trigger exists for the given object
-     * Uses the expected trigger naming convention: DateStamp_{ObjectName}_BT
-     */
-    private static Boolean checkTriggerExists(String objectApiName) {
-        try {
-            // Expected trigger name based on DateStampTriggerDeployer convention
-            String expectedTriggerName = 'DateStamp_' + objectApiName + '_BT';
-            
-            // Query ApexTrigger to check if the trigger exists
-            List<ApexTrigger> triggers = [
-                SELECT Id, Name 
-                FROM ApexTrigger 
-                WHERE Name = :expectedTriggerName
-                AND Status = 'Active'
-                LIMIT 1
-            ];
-            
-            return !triggers.isEmpty();
-        } catch (Exception e) {
-            // If we can't query triggers (permissions issue), assume not deployed
-            return false;
-        }
-    }
-    
-    /**
      * Returns a list of objects with their statistics including field count and trigger deployment status.
      * Uses efficient SOQL with aggregation to minimize queries and provide optimal performance.
      */
@@ -156,7 +182,7 @@ public with sharing class DateBuddyDeployController {
             List<ObjectCardWrapper> results = new List<ObjectCardWrapper>();
             
             // Since metadata queries have limitations with aggregation, process manually
-            List<Date_Stamp_Mapping__mdt> allMappings = [
+            List<Date_Stamp_Mapping__mdt> allMappings = mockMappings != null ? mockMappings : [
                 SELECT Object_API_Name__c, Picklist_API_Name__c, Date_Field_API_Name__c, 
                        Exit_Date_Field_API_Name__c, Direction__c
                 FROM Date_Stamp_Mapping__mdt
@@ -237,8 +263,8 @@ public with sharing class DateBuddyDeployController {
                 Integer entryMappings = objectToEntryCount.get(objectApiName);
                 Integer exitMappings = objectToExitCount.get(objectApiName);
                 
-                // Check if trigger is deployed
-                Boolean hasDeployedTrigger = checkTriggerExists(objectApiName);
+                // Check if trigger exists for this object
+                Boolean isDeployed = checkForExistingTrigger(objectApiName);
                 
                 results.add(new ObjectCardWrapper(
                     objectApiName, 
@@ -246,7 +272,7 @@ public with sharing class DateBuddyDeployController {
                     entryMappings, 
                     exitMappings, 
                     fieldCount,
-                    hasDeployedTrigger
+                    isDeployed
                 ));
             }
             
@@ -378,10 +404,15 @@ public with sharing class DateBuddyDeployController {
      * Uses the same pattern as the existing deployment logic.
      */
     private static Boolean checkForExistingTrigger(String objectApiName) {
+        // Allow test mocking
+        if (Test.isRunningTest() && mockTriggerExists != null) {
+            return mockTriggerExists;
+        }
+        
         try {
-            // Use a naming pattern to check for trigger existence
-            // Assuming trigger name pattern like 'DateStampTrigger_{ObjectName}'
-            String triggerNamePattern = 'DateStampTrigger_' + objectApiName;
+            // Use the same naming pattern as DateStampTriggerDeployer.generateTriggerName()
+            // Pattern: 'DateStamp_{ObjectName}_BT'
+            String triggerNamePattern = 'DateStamp_' + objectApiName + '_BT';
             
             // Use SOQL to check if trigger exists
             List<ApexTrigger> triggers = [
@@ -443,6 +474,91 @@ public with sharing class DateBuddyDeployController {
     @AuraEnabled(cacheable=false)
     public static AsyncStatusDTO getStatus(String asyncId) {
         return getDeploymentStatus(asyncId);
+    }
+
+    /**
+     * Get detailed deployment status including test results
+     */
+    @AuraEnabled(cacheable=false)
+    public static DeploymentStatusWrapper getDetailedDeploymentStatus(String deploymentId) {
+        if (String.isBlank(deploymentId)) {
+            throw new AuraHandledException('Deployment ID is required');
+        }
+        
+        DeploymentStatusWrapper wrapper = new DeploymentStatusWrapper();
+        
+        try {
+            // Allow test to force exception
+            if (Test.isRunningTest() && forceMetadataServiceException) {
+                throw new CalloutException('Mock MetadataService exception');
+            }
+            
+            // Get deployment status from Metadata API
+            MetadataService.MetadataPort service = MetadataService.createService();
+            MetadataService.DeployResult deployResult = service.checkDeployStatus(deploymentId, true);
+            
+            // Map basic deployment info
+            wrapper.id = deployResult.id;
+            wrapper.status = deployResult.status;
+            wrapper.done = deployResult.done;
+            wrapper.numberComponentsDeployed = deployResult.numberComponentsDeployed;
+            wrapper.numberComponentsTotal = deployResult.numberComponentsTotal;
+            wrapper.numberComponentErrors = deployResult.numberComponentErrors;
+            wrapper.numberTestsCompleted = deployResult.numberTestsCompleted;
+            wrapper.numberTestsTotal = deployResult.numberTestsTotal;
+            wrapper.numberTestErrors = deployResult.numberTestErrors;
+            
+            // Process test results if available
+            if (deployResult.details != null && deployResult.details.runTestResult != null) {
+                MetadataService.RunTestsResult testResult = deployResult.details.runTestResult;
+                
+                // Process test failures
+                if (testResult.failures != null) {
+                    for (MetadataService.RunTestFailure failure : testResult.failures) {
+                        TestResult tr = new TestResult();
+                        tr.className = failure.name;
+                        tr.methodName = failure.methodName;
+                        tr.outcome = 'Fail';
+                        tr.message = failure.message;
+                        tr.stackTrace = failure.stackTrace;
+                        tr.executionTime = failure.time_x;
+                        wrapper.testResults.add(tr);
+                    }
+                }
+                
+                // Process successful tests
+                if (testResult.successes != null) {
+                    for (MetadataService.RunTestSuccess success : testResult.successes) {
+                        TestResult tr = new TestResult();
+                        tr.className = success.name;
+                        tr.methodName = success.methodName;
+                        tr.outcome = 'Pass';
+                        tr.executionTime = success.time_x;
+                        wrapper.testResults.add(tr);
+                    }
+                }
+            }
+            
+            // Process component errors if any
+            if (deployResult.details != null && deployResult.details.componentFailures != null) {
+                for (MetadataService.DeployMessage failure : deployResult.details.componentFailures) {
+                    String errorMsg = failure.fullName + ': ' + failure.problem;
+                    if (failure.lineNumber != null) {
+                        errorMsg += ' (Line ' + failure.lineNumber + ')';
+                    }
+                    wrapper.componentErrors.add(errorMsg);
+                }
+            }
+            
+        } catch (Exception e) {
+            // If we can't get detailed status, return basic info
+            wrapper.id = deploymentId;
+            wrapper.status = 'Unknown';
+            wrapper.done = false;
+            wrapper.componentErrors.add('Unable to retrieve deployment details: ' + e.getMessage());
+        }
+        
+        return wrapper;
     }
 
     /**

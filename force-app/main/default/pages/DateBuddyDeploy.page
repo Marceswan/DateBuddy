@@ -23,7 +23,7 @@
                 // Generate base64 ZIP
                 return zip.generateAsync({type: "base64"})
                     .then(function(base64) {
-                        return deployTriggerZip(base64, packageData.testClassName, packageData.triggerName);
+                        return deployTriggerZip(base64, objectApiName);
                     });
             } catch(e) {
                 console.error('Error creating ZIP:', e);
@@ -35,19 +35,59 @@
             }
         }
         
-        function deployTriggerZip(base64Zip, testClassName, triggerName) {
+        // Legacy function kept for compatibility
+        function createTriggerZip(objectApiName, triggerName, triggerSource) {
+            try {
+                var zip = new JSZip();
+                
+                // Create package.xml
+                var packageXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                    '<Package xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
+                    '    <types>\n' +
+                    '        <members>' + triggerName + '</members>\n' +
+                    '        <name>ApexTrigger</name>\n' +
+                    '    </types>\n' +
+                    '    <version>62.0</version>\n' +
+                    '</Package>';
+                
+                // Create trigger meta.xml
+                var triggerMetaXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+                    '<ApexTrigger xmlns="http://soap.sforce.com/2006/04/metadata">\n' +
+                    '    <apiVersion>62.0</apiVersion>\n' +
+                    '    <status>Active</status>\n' +
+                    '</ApexTrigger>';
+                
+                // Add files to ZIP
+                zip.file("package.xml", packageXml);
+                zip.folder("triggers").file(triggerName + ".trigger", triggerSource);
+                zip.folder("triggers").file(triggerName + ".trigger-meta.xml", triggerMetaXml);
+                
+                // Generate base64 ZIP
+                return zip.generateAsync({type: "base64"})
+                    .then(function(base64) {
+                        return deployTriggerZip(base64, objectApiName);
+                    });
+            } catch(e) {
+                console.error('Error creating ZIP:', e);
+                window.deploymentResult = {
+                    success: false,
+                    error: e.message || 'Failed to create ZIP file'
+                };
+                return Promise.reject(e);
+            }
+        }
+        
+        function deployTriggerZip(base64Zip, objectApiName) {
             return new Promise(function(resolve, reject) {
                 Visualforce.remoting.Manager.invokeAction(
                     '{!$RemoteAction.DateStampTriggerDeployer.deployZip}',
                     base64Zip,
-                    testClassName,
-                    triggerName,
+                    objectApiName,
                     function(result, event) {
                         if (event.status) {
                             window.deploymentResult = {
                                 success: true,
-                                asyncResultId: result,
-                                deploymentId: result
+                                asyncResultId: result
                             };
                             resolve(result);
                         } else {
@@ -302,13 +342,12 @@
             
             testResults.forEach(function(test) {
                 var row = tbody.insertRow();
-                row.insertCell(0).textContent = test.className || test.name || 'Unknown';
+                row.insertCell(0).textContent = test.className || 'Unknown';
                 row.insertCell(1).textContent = test.methodName || 'Unknown';
                 
                 var statusCell = row.insertCell(2);
-                var outcome = test.outcome || (test.success ? 'Pass' : 'Fail');
-                statusCell.textContent = outcome;
-                statusCell.className = outcome === 'Pass' ? 'test-pass' : 'test-fail';
+                statusCell.textContent = test.outcome || 'Unknown';
+                statusCell.className = test.outcome === 'Pass' ? 'test-pass' : 'test-fail';
                 
                 row.insertCell(3).textContent = test.message || '';
                 
@@ -329,13 +368,7 @@
             errors.forEach(function(error) {
                 var errorDiv = document.createElement('div');
                 errorDiv.className = 'error-message';
-                var errorText = '';
-                if (typeof error === 'object') {
-                    errorText = (error.fileName || '') + ': ' + (error.problem || error.message || JSON.stringify(error));
-                } else {
-                    errorText = error;
-                }
-                errorDiv.textContent = errorText;
+                errorDiv.textContent = error;
                 errorContainer.appendChild(errorDiv);
             });
         }
@@ -345,81 +378,62 @@
             deploymentStartTime = Date.now();
             
             pollingInterval = setInterval(function() {
-                window.checkDeploymentStatus(asyncResultId)
-                    .then(function(result) {
-                        // Update progress
-                        updateProgressBar(result.numberComponentsDeployed || 0, result.numberComponentsTotal || 0);
-                        document.getElementById('deployStatus').textContent = 
-                            'Status: ' + (result.status || 'Processing');
-                        
-                        // Notify parent window (LWC) of status update
-                        if (window.parent && window.parent !== window) {
-                            window.parent.postMessage({
-                                type: 'deploymentStatus',
-                                deploymentId: asyncResultId,
-                                status: result
-                            }, '*');
+                Visualforce.remoting.Manager.invokeAction(
+                    '{!$RemoteAction.DateStampTriggerDeployer.checkDeploymentStatus}',
+                    asyncResultId,
+                    function(result, event) {
+                        if (event.status && result) {
+                            // Update progress
+                            updateProgressBar(result.numberComponentsDeployed || 0, result.numberComponentsTotal || 0);
+                            document.getElementById('deployStatus').textContent = 
+                                'Status: ' + (result.status || 'Processing');
+                            
+                            // Check if deployment is done
+                            if (result.done) {
+                                clearInterval(pollingInterval);
+                                
+                                // Display test results
+                                if (result.testResults) {
+                                    displayTestResults(result.testResults);
+                                }
+                                
+                                // Display errors
+                                if (result.componentErrors) {
+                                    displayErrors(result.componentErrors);
+                                }
+                                
+                                // Handle completion
+                                if (result.status === 'Succeeded') {
+                                    var successDiv = document.createElement('div');
+                                    successDiv.className = 'success-message';
+                                    successDiv.innerHTML = '<strong>Deployment Successful!</strong><br/>All components deployed successfully.';
+                                    document.getElementById('message').appendChild(successDiv);
+                                    
+                                    // Auto-close after 2 seconds only on success
+                                    setTimeout(function() {
+                                        window.close();
+                                    }, 2000);
+                                } else if (result.status === 'Failed' || result.status === 'Canceled') {
+                                    // For failed or canceled deployments, show message but don't auto-close
+                                    var closeDiv = document.createElement('div');
+                                    closeDiv.className = 'close-message';
+                                    closeDiv.innerHTML = 'Deployment ' + result.status.toLowerCase() + '. You can close this window when you are ready.';
+                                    document.getElementById('message').appendChild(closeDiv);
+                                    
+                                    // Set error result for parent window
+                                    window.deploymentResult = {
+                                        success: false,
+                                        error: 'Deployment ' + result.status
+                                    };
+                                }
+                            }
+                        } else {
+                            // Error checking status
+                            console.error('Error checking status:', event.message);
                         }
-                        
-                        // Check if deployment is done
-                        if (result.done) {
-                            clearInterval(pollingInterval);
-                            
-                            // Display test results
-                            if (result.testFailures && result.testFailures.length > 0) {
-                                displayTestResults(result.testFailures);
-                            }
-                            
-                            // Display component errors
-                            if (result.componentFailures && result.componentFailures.length > 0) {
-                                displayErrors(result.componentFailures);
-                            }
-                            
-                            // Send final notification to parent
-                            if (window.parent && window.parent !== window) {
-                                window.parent.postMessage({
-                                    type: 'deploymentComplete',
-                                    deploymentId: asyncResultId,
-                                    status: result
-                                }, '*');
-                            }
-                            
-                            // Handle completion
-                            if (result.status === 'Succeeded') {
-                                var successDiv = document.createElement('div');
-                                successDiv.className = 'success-message';
-                                successDiv.innerHTML = '<strong>✓ Deployment Successful!</strong><br/>All components deployed successfully.';
-                                document.getElementById('message').appendChild(successDiv);
-                                
-                                // Show auto-close notice
-                                var closeNotice = document.createElement('div');
-                                closeNotice.className = 'close-message';
-                                closeNotice.innerHTML = 'This window will close automatically in a moment...';
-                                document.getElementById('message').appendChild(closeNotice);
-                                
-                                // Auto-close after 2 seconds only on success
-                                setTimeout(function() {
-                                    window.close();
-                                }, 2000);
-                            } else if (result.status === 'Failed' || result.status === 'Canceled') {
-                                // For failed or canceled deployments, show message but don't auto-close
-                                var closeDiv = document.createElement('div');
-                                closeDiv.className = 'close-message';
-                                closeDiv.innerHTML = 'Deployment ' + result.status.toLowerCase() + '. You can close this window when you are ready.';
-                                document.getElementById('message').appendChild(closeDiv);
-                                
-                                // Set error result for parent window
-                                window.deploymentResult = {
-                                    success: false,
-                                    error: 'Deployment ' + result.status
-                                };
-                            }
-                        }
-                    })
-                    .catch(function(error) {
-                        // Error checking status, retry
-                        console.error('Error checking status:', error);
-                    });
+                    },
+                    {escape: false}
+                );
             }, 2000); // Poll every 2 seconds
         }
         

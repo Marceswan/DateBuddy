@@ -1,6 +1,15 @@
+<!--
+  @description       : 
+  @author            : ChangeMeIn@UserSettingsUnder.SFDoc
+  @group             : 
+  @last modified on  : 08-31-2025
+  @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
+-->
 <template>
     <div class="slds-p-around_medium">
-        <div class="slds-text-heading_large slds-m-bottom_medium">DateBuddy Trigger Deployer</div>
+        <lightning-card>
+            
+        <div class="slds-text-heading_large slds-m-around_medium">DateBuddy Trigger Deployer</div>
         
         <!-- Loading Spinner -->
         <template if:true={isLoading}>
@@ -21,8 +30,8 @@
             <div class="slds-grid slds-wrap slds-gutters">
                 <template for:each={cards} for:item="card">
                     <div key={card.objectApiName} 
-                         class="slds-col slds-size_1-of-4 slds-large-size_1-of-4 slds-medium-size_1-of-3 slds-small-size_1-of-2 slds-m-around_small">
-                        <article class="slds-card datebuddy-object-card" 
+                         class="slds-col slds-size_1-of-1 slds-small-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-4 slds-p-around_small">
+                        <article class="slds-card datebuddy-object-card slds-m-left_small" 
                                  data-object={card.objectApiName} 
                                  onclick={handleCardClick}
                                  role="button"
@@ -68,18 +77,24 @@
                                             aria-label={card.viewDetailsAriaLabel}>
                                         View Details
                                     </button>
-                                    <button class="slds-button slds-button_brand slds-button_small"
-                                            onclick={handleDeployClick}
-                                            data-object={card.objectApiName}
-                                            disabled={isBusy}
-                                            aria-label={card.deployAriaLabel}>
-                                        <template if:true={card.hasDeployedTrigger}>
+                                    <template if:true={card.hasDeployedTrigger}>
+                                        <button class="slds-button slds-button_brand slds-button_small"
+                                                onclick={handleDeployClick}
+                                                data-object={card.objectApiName}
+                                                disabled={isBusy}
+                                                aria-label={card.deployAriaLabel}>
                                             Re-Deploy Trigger
-                                        </template>
-                                        <template if:false={card.hasDeployedTrigger}>
+                                        </button>
+                                    </template>
+                                    <template if:false={card.hasDeployedTrigger}>
+                                        <button class="slds-button slds-button_brand slds-button_small"
+                                                onclick={handleDeployClick}
+                                                data-object={card.objectApiName}
+                                                disabled={isBusy}
+                                                aria-label={card.deployAriaLabel}>
                                             Deploy Trigger
-                                        </template>
-                                    </button>
+                                        </button>
+                                    </template>
                                 </div>
                             </footer>
                         </article>
@@ -126,91 +141,6 @@
             </div>
         </template>
         
-        <!-- Deployment Error Details -->
-        <template if:true={deploymentFailed}>
-            <div class="slds-m-top_medium">
-                <!-- Component Failures Table -->
-                <template if:true={hasDeploymentErrors}>
-                    <div class="slds-box slds-theme_shade slds-m-bottom_medium">
-                        <h3 class="slds-text-heading_small slds-m-bottom_small">
-                            <lightning-icon icon-name="utility:error" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
-                            Component Failures
-                        </h3>
-                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
-                            <thead>
-                                <tr class="slds-line-height_reset">
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="File Name">File Name</div>
-                                    </th>
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="Error Message">Error Message</div>
-                                    </th>
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="Line:Column">Line:Column</div>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template for:each={deploymentErrors} for:item="error">
-                                    <tr key={error.id} class="slds-hint-parent">
-                                        <td data-label="File Name">
-                                            <div class="slds-truncate" title={error.fileName}>{error.fileName}</div>
-                                        </td>
-                                        <td data-label="Error Message">
-                                            <div class="slds-truncate" title={error.problem}>{error.problem}</div>
-                                        </td>
-                                        <td data-label="Line:Column">
-                                            <div class="slds-truncate">{error.lineNumber}:{error.columnNumber}</div>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
-                
-                <!-- Test Failures Table -->
-                <template if:true={hasTestFailures}>
-                    <div class="slds-box slds-theme_shade">
-                        <h3 class="slds-text-heading_small slds-m-bottom_small">
-                            <lightning-icon icon-name="utility:warning" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
-                            Apex Test Failures
-                        </h3>
-                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
-                            <thead>
-                                <tr class="slds-line-height_reset">
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="Class Name">Class Name</div>
-                                    </th>
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="Method Name">Method Name</div>
-                                    </th>
-                                    <th scope="col">
-                                        <div class="slds-truncate" title="Error Message">Error Message</div>
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template for:each={deploymentTestFailures} for:item="test">
-                                    <tr key={test.id} class="slds-hint-parent">
-                                        <td data-label="Class Name">
-                                            <div class="slds-truncate" title={test.className}>{test.className}</div>
-                                        </td>
-                                        <td data-label="Method Name">
-                                            <div class="slds-truncate" title={test.methodName}>{test.methodName}</div>
-                                        </td>
-                                        <td data-label="Error Message">
-                                            <div title={test.message}>{test.message}</div>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
-            </div>
-        </template>
-        
         <!-- Trigger Source Display -->
         <template if:true={source}>
             <div class="slds-m-top_medium">
@@ -222,7 +152,214 @@
                 </lightning-textarea>
             </div>
         </template>
+        </lightning-card>
     </div>
+    
+    <!-- Deployment Progress Modal -->
+    <template if:true={showDeploymentProgress}>
+        <section role="dialog" 
+                 tabindex="-1" 
+                 aria-labelledby="deployment-modal-heading" 
+                 aria-modal="true" 
+                 aria-describedby="deployment-modal-content" 
+                 class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <button class="slds-button slds-button_icon slds-modal__close slds-button_icon-inverse" 
+                            title="Close" 
+                            onclick={closeDeploymentProgress}
+                            disabled={isDeploying}
+                            aria-label="Close deployment progress">
+                        <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                        <span class="slds-assistive-text">Close</span>
+                    </button>
+                    <h2 id="deployment-modal-heading" class="slds-modal__title slds-hyphenate">
+                        Deployment Progress
+                    </h2>
+                    <p class="slds-m-top_x-small">
+                        Deploying trigger for {objectApiName}
+                    </p>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium" id="deployment-modal-content">
+                    <!-- Deployment Status Section -->
+                    <template if:true={deploymentStatus}>
+                        <div class="slds-section slds-is-open">
+                            <h3 class="slds-section__title">
+                                <span class="slds-truncate">Deployment Status: {deploymentStatus.status}</span>
+                            </h3>
+                            <div class="slds-section__content">
+                                <!-- Component Deployment Progress -->
+                                <div class="slds-m-bottom_medium">
+                                    <div class="slds-grid slds-grid_align-spread slds-m-bottom_x-small">
+                                        <span class="slds-text-body_small">
+                                            <lightning-icon icon-name="utility:package" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                            Deploy Components
+                                        </span>
+                                        <span class="slds-text-body_small">
+                                            {deploymentStatus.numberComponentsDeployed}/{deploymentStatus.numberComponentsTotal}
+                                        </span>
+                                    </div>
+                                    <div class="slds-progress-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={deploymentProgressPercent} role="progressbar">
+                                        <span class="slds-progress-bar__value" style={deploymentProgressStyle}>
+                                            <span class="slds-assistive-text">Progress: {deploymentProgressPercent}%</span>
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Test Execution Progress -->
+                                <template if:true={deploymentStatus.numberTestsTotal}>
+                                    <div class="slds-m-bottom_medium">
+                                        <div class="slds-grid slds-grid_align-spread slds-m-bottom_x-small">
+                                            <span class="slds-text-body_small">
+                                                <lightning-icon icon-name="utility:check" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                                Run Apex Tests
+                                            </span>
+                                            <span class="slds-text-body_small">
+                                                {deploymentStatus.numberTestsCompleted}/{deploymentStatus.numberTestsTotal}
+                                                <template if:true={deploymentStatus.numberTestErrors}>
+                                                    <span class="slds-text-color_error"> ({deploymentStatus.numberTestErrors} failed)</span>
+                                                </template>
+                                            </span>
+                                        </div>
+                                        <div class="slds-progress-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={testProgressPercent} role="progressbar">
+                                            <span class="slds-progress-bar__value" style={testProgressStyle}>
+                                                <span class="slds-assistive-text">Progress: {testProgressPercent}%</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- Test Results Section -->
+                    <template if:true={hasTestResults}>
+                        <div class="slds-section slds-is-open slds-m-top_medium">
+                            <h3 class="slds-section__title">
+                                <span class="slds-truncate">Apex Test Results</span>
+                            </h3>
+                            <div class="slds-section__content">
+                                <!-- Failed Tests Table -->
+                                <template if:true={failedTests.length}>
+                                    <div class="slds-box slds-theme_error slds-m-bottom_medium">
+                                        <h4 class="slds-text-heading_small slds-m-bottom_small">
+                                            <lightning-icon icon-name="utility:error" size="small" variant="error" class="slds-m-right_x-small"></lightning-icon>
+                                            Apex Test Failures
+                                        </h4>
+                                        <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                            <thead>
+                                                <tr class="slds-line-height_reset">
+                                                    <th scope="col">
+                                                        <div class="slds-truncate" title="Class Name">Class Name</div>
+                                                    </th>
+                                                    <th scope="col">
+                                                        <div class="slds-truncate" title="Method Name">Method Name</div>
+                                                    </th>
+                                                    <th scope="col">
+                                                        <div class="slds-truncate" title="Error Message">Error Message</div>
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <template for:each={failedTests} for:item="test">
+                                                    <tr key={test.className} class="slds-hint-parent">
+                                                        <td data-label="Class Name">
+                                                            <div class="slds-truncate" title={test.className}>{test.className}</div>
+                                                        </td>
+                                                        <td data-label="Method Name">
+                                                            <div class="slds-truncate" title={test.methodName}>{test.methodName}</div>
+                                                        </td>
+                                                        <td data-label="Error Message">
+                                                            <div title={test.message}>
+                                                                <p class="slds-text-body_small slds-text-color_error">{test.message}</p>
+                                                                <template if:true={test.stackTrace}>
+                                                                    <details class="slds-m-top_xx-small">
+                                                                        <summary class="slds-text-body_small slds-text-link">Stack Trace</summary>
+                                                                        <pre class="slds-text-body_small slds-m-top_xx-small" style="font-size: 0.7rem; overflow-x: auto; background: #f3f3f3; padding: 0.5rem; border-radius: 0.25rem;">{test.stackTrace}</pre>
+                                                                    </details>
+                                                                </template>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </template>
+                                
+                                <!-- Passed Tests Summary -->
+                                <template if:true={passedTests.length}>
+                                    <div class="slds-scoped-notification slds-media slds-media_center slds-theme_success">
+                                        <div class="slds-media__figure">
+                                            <lightning-icon icon-name="utility:success" size="small" variant="inverse"></lightning-icon>
+                                        </div>
+                                        <div class="slds-media__body">
+                                            <p><strong>{passedTests.length} Test(s) Passed Successfully</strong></p>
+                                            <details class="slds-m-top_x-small">
+                                                <summary class="slds-text-body_small slds-text-link">View Passed Tests</summary>
+                                                <div class="slds-m-top_x-small">
+                                                    <template for:each={passedTests} for:item="test">
+                                                        <p key={test.className} class="slds-text-body_small">
+                                                            ✓ {test.className}.{test.methodName}
+                                                            <template if:true={test.executionTime}>
+                                                                ({test.executionTime}ms)
+                                                            </template>
+                                                        </p>
+                                                    </template>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- Component Errors Section -->
+                    <template if:true={hasDeploymentErrors}>
+                        <div class="slds-section slds-is-open slds-m-top_medium">
+                            <h3 class="slds-section__title">
+                                <span class="slds-truncate">Deployment Errors</span>
+                            </h3>
+                            <div class="slds-section__content">
+                                <div class="slds-scoped-notification slds-media slds-media_center slds-theme_error">
+                                    <div class="slds-media__figure">
+                                        <lightning-icon icon-name="utility:warning" size="small" variant="inverse"></lightning-icon>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <template for:each={deploymentErrors} for:item="error">
+                                            <p key={error} class="slds-text-body_small slds-m-bottom_x-small">{error}</p>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <!-- Loading state while deploying -->
+                    <template if:false={deploymentStatus}>
+                        <div class="slds-align_absolute-center slds-p-around_large">
+                            <lightning-spinner alternative-text="Starting deployment..." size="medium"></lightning-spinner>
+                        </div>
+                    </template>
+                </div>
+                <footer class="slds-modal__footer">
+                    <template if:true={deploymentCloseMessage}>
+                        <span class="slds-text-body_small slds-text-color_weak slds-m-right_medium">
+                            {deploymentCloseMessage}
+                        </span>
+                    </template>
+                    <button class="slds-button slds-button_neutral" 
+                            onclick={closeDeploymentProgress}
+                            disabled={isDeploying}>
+                        <template if:true={isDeploying}>Deploying...</template>
+                        <template if:false={isDeploying}>Close</template>
+                    </button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
     
     <!-- Modal for Field Details -->
     <template if:true={showModal}>
@@ -311,7 +448,7 @@
                     </button>
                     <button class="slds-button slds-button_brand" 
                             onclick={handleModalDeploy}
-                            disabled={isBusy}>
+                            disabled={isDeployDisabled}>
                         Deploy Trigger for {selectedObjectApiName}
                     </button>
                 </footer>
