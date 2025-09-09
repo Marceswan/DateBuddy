@@ -1,7 +1,7 @@
 # DateBuddy
 
 [![Salesforce API](https://img.shields.io/badge/Salesforce%20API-v64.0-blue)](https://developer.salesforce.com/)
-[![Package Version](https://img.shields.io/badge/Package%20Version-1.1.0--1-green)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU)
+[![Package Version](https://img.shields.io/badge/Package%20Version-1.3.0-green)](https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aWMLIA2)
 [![Code Coverage](https://img.shields.io/badge/Code%20Coverage-90%2B%25-brightgreen)](https://trailhead.salesforce.com/content/learn/modules/apex_testing)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -30,7 +30,7 @@ The application uses Custom Metadata Types for configuration, making it highly f
 
 1. **Install the DateBuddy package** using the latest version:
    ```
-   https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU
+   https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aWMLIA2
    ```
 
 2. **Grant appropriate permissions** to users who will configure DateBuddy:
@@ -43,7 +43,7 @@ The application uses Custom Metadata Types for configuration, making it highly f
 
 ```bash
 # Install the package
-sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG_ALIAS --wait 10
+sf package install --package 04tWs000000aWMLIA2 --target-org YOUR_ORG_ALIAS --wait 10
 
 # Verify installation
 sf package installed list --target-org YOUR_ORG_ALIAS
@@ -564,11 +564,12 @@ DateBuddy maintains high code quality standards:
 - **Minimum Required Coverage**: 90%
 - **Current Coverage**: 90%+
 - **Test Classes**:
-  - `DateBuddyHandlerTest`
-  - `DateStampTriggerDeployerTest`
-  - `DateBuddyDeployControllerTest`
-  - `UpdateDateFieldActionTest`
+  - `DateBuddyHandlerTest` - 96% coverage
+  - `DateStampTriggerDeployerTest` - 86% coverage
+  - `DateBuddyDeployControllerTest` - 90% coverage
+  - `UpdateDateFieldActionTest` - 90% coverage
   - `MetadataServiceTest`
+  - `RemoteSiteHelperTest`
 
 Run tests after any configuration changes:
 ```bash
@@ -655,6 +656,8 @@ To track when a Contact's Status changes to "Connected":
 - **Deployment Method**: Uses JSZip methodology from apex-mdapi (not Zippex)
 - **Handler Logic**: Centralized in `DateBuddyHandler` class
 - **Metadata Service**: Custom implementation for dynamic trigger deployment
+- **Client-Side Processing**: LWC handles direction determination for improved performance
+- **Dependency Management**: See Dependencies.md for complete dependency mapping
 
 ### Key Components
 
@@ -668,11 +671,13 @@ To track when a Contact's Status changes to "Connected":
   - `Direction__c`: Direction indicator (Entering/Exiting/In/Out)
 
 #### Apex Classes
-- **DateBuddyHandler**: Core trigger handler for date stamping
-- **UpdateDateFieldAction**: Invocable action for Flow Builder
-- **DateBuddyDeployController**: LWC controller for trigger deployment
-- **DateStampTriggerDeployer**: Utility for deploying triggers dynamically
+- **DateBuddyHandler**: Core trigger handler for date stamping (96% coverage)
+- **UpdateDateFieldAction**: Invocable action for Flow Builder (90% coverage)
+- **DateBuddyDeployController**: LWC controller for trigger deployment (90% coverage)
+- **DateStampTriggerDeployer**: Utility for deploying triggers dynamically (86% coverage)
 - **MetadataService**: Metadata API wrapper for deployments
+- **RemoteSiteHelperController**: Remote site settings management
+- **MetadataServiceExamples**: Example implementations from apex-mdapi
 
 #### Lightning Web Components
 - **dateBuddyTriggerDeployer**: UI for deploying triggers to objects
@@ -682,18 +687,20 @@ To track when a Contact's Status changes to "Connected":
 ### Current Version
 - **Package Name**: DateBuddy
 - **Package ID**: `0HoWs0000001qqzKAA`
-- **Current Version**: 1.1.0-1
-- **Subscriber Package Version ID**: `04tWs000000aW1NIAU`
+- **Current Version**: 1.3.0
+- **Subscriber Package Version ID**: `04tWs000000aWMLIA2`
 - **Package Type**: Unlocked
 - **DevHub**: GSO-Org (marc-zbcx@force.com)
 - **API Version**: 64.0
 
 ### Installation URL
 ```
-https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU
+https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aWMLIA2
 ```
 
 ### Version History
+- **1.3.0** (`04tWs000000aWMLIA2`) - Added metadata service components, dependency mapping, and test improvements
+- **1.2.0-1** (`04tWs000000aWKjIAM`) - Enhanced UI with client-side processing and improved terminology
 - **1.1.0-1** (`04tWs000000aW1NIAU`) - Added MetadataServiceTest class for improved test coverage
 - **1.0.0-1** (`04tWs000000aVzlIAE`) - Initial release with core DateBuddy functionality
 
@@ -704,7 +711,7 @@ https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIA
 sf package version create --package DateBuddy --installation-key-bypass --wait 20 --skip-validation
 
 # Install package
-sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG --wait 10
+sf package install --package 04tWs000000aWMLIA2 --target-org YOUR_ORG --wait 10
 
 # List package versions
 sf package version list --package DateBuddy

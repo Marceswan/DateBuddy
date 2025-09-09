@@ -2,6 +2,7 @@ import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import deployTrigger from '@salesforce/apex/DateBuddyDeployController.deployTrigger';
 import getStatus from '@salesforce/apex/DateBuddyDeployController.getStatus';
+import getDetailedDeploymentStatus from '@salesforce/apex/DateBuddyDeployController.getDetailedDeploymentStatus';
 import listSObjects from '@salesforce/apex/DateBuddyDeployController.listSObjects';
 import getTriggerSource from '@salesforce/apex/DateBuddyDeployController.getTriggerSource';
 import getObjectsWithStats from '@salesforce/apex/DateBuddyDeployController.getObjectsWithStats';
@@ -41,6 +42,15 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
         { label: 'Direction', fieldName: 'direction', type: 'text' }
     ];
     
+    // Deployment progress properties
+    @track showDeploymentProgress = false;
+    @track deploymentStatus = null;
+    @track deploymentId = null;
+    @track deploymentTestResults = [];
+    @track deploymentErrors = [];
+    @track isDeploying = false;
+    @track deploymentCloseMessage = '';
+    
     // Cache for performance
     _cardsCache = new Map();
     _fieldMappingsCache = new Map();
@@ -65,9 +75,10 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
                 ...card,
                 objectApiName: card.objectName, // Map to expected property name
                 objectLabel: card.objectName, // Use objectName as label for now
+                hasDeployedTrigger: card.isDeployed || false, // Map isDeployed to hasDeployedTrigger
                 cardAriaLabel: `${card.objectName} - ${card.fieldCount} unique fields, ${card.totalMappings} total mappings`,
                 viewDetailsAriaLabel: `View field mapping details for ${card.objectName}`,
-                deployAriaLabel: `Deploy trigger for ${card.objectName}`
+                deployAriaLabel: card.isDeployed ? `Re-deploy trigger for ${card.objectName}` : `Deploy trigger for ${card.objectName}`
             }));
             this._cardsCache.set('cards', this.cards);
         } catch (error) {
@@ -239,6 +250,72 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     toggleLegacyMode() {
         this.showLegacyMode = !this.showLegacyMode;
     }
+    
+    closeDeploymentProgress() {
+        this.showDeploymentProgress = false;
+        this.deploymentStatus = null;
+        this.deploymentTestResults = [];
+        this.deploymentErrors = [];
+        this.deploymentCloseMessage = '';
+    }
+    
+    get hasTestResults() {
+        return this.deploymentTestResults && this.deploymentTestResults.length > 0;
+    }
+    
+    get hasDeploymentErrors() {
+        return this.deploymentErrors && this.deploymentErrors.length > 0;
+    }
+    
+    get deploymentProgressPercent() {
+        if (!this.deploymentStatus || !this.deploymentStatus.numberComponentsTotal) return 0;
+        return Math.round((this.deploymentStatus.numberComponentsDeployed / this.deploymentStatus.numberComponentsTotal) * 100);
+    }
+    
+    get testProgressPercent() {
+        if (!this.deploymentStatus || !this.deploymentStatus.numberTestsTotal) return 0;
+        return Math.round((this.deploymentStatus.numberTestsCompleted / this.deploymentStatus.numberTestsTotal) * 100);
+    }
+    
+    get failedTests() {
+        return this.deploymentTestResults.filter(test => test.outcome === 'Fail');
+    }
+    
+    get passedTests() {
+        return this.deploymentTestResults.filter(test => test.outcome === 'Pass');
+    }
+    
+    get deploymentProgressStyle() {
+        return `width: ${this.deploymentProgressPercent}%`;
+    }
+    
+    get testProgressStyle() {
+        const hasErrors = this.deploymentStatus && this.deploymentStatus.numberTestErrors > 0;
+        const color = hasErrors ? 'background-color: #c23934;' : '';
+        return `width: ${this.testProgressPercent}%; ${color}`;
+    }
+    
+    checkForValidationRuleConflict(detailedStatus) {
+        // Check test results for validation rule conflicts
+        if (detailedStatus.testResults) {
+            for (const test of detailedStatus.testResults) {
+                if (test.message && test.message.includes('FIELD_CUSTOM_VALIDATION_EXCEPTION')) {
+                    return true;
+                }
+            }
+        }
+        
+        // Check component errors for validation rule conflicts
+        if (detailedStatus.componentErrors) {
+            for (const error of detailedStatus.componentErrors) {
+                if (error && error.includes('FIELD_CUSTOM_VALIDATION_EXCEPTION')) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
 
     handleLegacyChange(event) {
         this.handleChange(event);
@@ -337,62 +414,161 @@ export default class DateBuddyTriggerDeployer extends LightningElement {
     }
 
     startPolling(asyncId) {
+        this.deploymentId = asyncId;
+        this.showDeploymentProgress = true;
+        this.isDeploying = true;
+        
         let attempts = 0;
-        const maxAttempts = 30; // ~30s
+        const maxAttempts = 60; // ~60s for longer deployments
         const intervalMs = 1000;
         this.clearPoll();
+        
         this.pollTimer = setInterval(async () => {
             attempts++;
             try {
-                const status = await getStatus({ asyncId });
-                this.message = `Status: ${status.state}${status.message ? ' — ' + status.message : ''}`;
-                if (status.done || attempts >= maxAttempts) {
-                    if (status.done) {
-                        const isSuccess = status.state === 'Completed';
+                // Get detailed deployment status
+                const detailedStatus = await getDetailedDeploymentStatus({ deploymentId: asyncId });
+                
+                // Update deployment status display
+                this.deploymentStatus = detailedStatus;
+                this.deploymentTestResults = detailedStatus.testResults || [];
+                this.deploymentErrors = detailedStatus.componentErrors || [];
+                
+                // Update message with progress
+                if (detailedStatus.numberComponentsTotal > 0) {
+                    this.message = `Deploying: ${detailedStatus.numberComponentsDeployed}/${detailedStatus.numberComponentsTotal} components`;
+                }
+                if (detailedStatus.numberTestsTotal > 0) {
+                    this.message += ` | Tests: ${detailedStatus.numberTestsCompleted}/${detailedStatus.numberTestsTotal}`;
+                }
+                
+                if (detailedStatus.done || attempts >= maxAttempts) {
+                    if (detailedStatus.done) {
+                        const isSuccess = detailedStatus.status === 'Succeeded';
+                        const hasTestFailures = detailedStatus.numberTestErrors > 0;
+                        
+                        // Check for validation rule conflicts
+                        const hasValidationRuleConflict = this.checkForValidationRuleConflict(detailedStatus);
+                        
+                        if (hasValidationRuleConflict) {
+                            // Show sticky toast for validation rule conflicts
+                            this.dispatchEvent(
+                                new ShowToastEvent({
+                                    title: 'Validation Rule Conflict',
+                                    message: 'Validation Rule Conflict detected. Please disable the rule and try again',
+                                    variant: 'error',
+                                    mode: 'sticky'  // User must dismiss
+                                })
+                            );
+                        }
+                        
                         this.dispatchEvent(
                             new ShowToastEvent({
                                 title: isSuccess ? 'Trigger Deployed' : 'Deployment Failed',
-                                message: isSuccess ? 'Metadata API reported Completed.' : (status.message || 'See debug logs for details.'),
-                                variant: isSuccess ? 'success' : 'error'
+                                message: isSuccess 
+                                    ? `Successfully deployed ${detailedStatus.numberComponentsDeployed} components` 
+                                    : (hasTestFailures 
+                                        ? `${detailedStatus.numberTestErrors} test(s) failed. See details below.` 
+                                        : 'Deployment failed. Check details below.'),
+                                variant: isSuccess ? 'success' : 'error',
+                                mode: isSuccess ? 'dismissible' : 'sticky'  // Sticky for errors
                             })
                         );
                         this.canRetry = !isSuccess;
+                        this.isDeploying = false;
+                        
                         if (isSuccess) {
                             try {
                                 this.source = await getTriggerSource({ objectApiName: this.objectApiName });
+                                // Refresh cards to show updated deployment status
+                                await this.loadCards();
+                                
+                                // Show success toast with deployment details
+                                this.dispatchEvent(
+                                    new ShowToastEvent({
+                                        title: '✅ Deployment Successful!',
+                                        message: `Trigger for ${this.objectApiName} has been deployed successfully. This window will close automatically.`,
+                                        variant: 'success',
+                                        mode: 'dismissible'
+                                    })
+                                );
+                                
+                                // Update message to inform about auto-close
+                                this.deploymentCloseMessage = 'Success! Closing automatically...';
+                                
+                                // Auto-close deployment window after showing success message
+                                setTimeout(() => {
+                                    this.closeDeploymentProgress();
+                                }, 2000);
                             } catch (e) {
-                                this.dispatchEvent(new ShowToastEvent({
-                                    title: 'Source Load Failed',
-                                    message: e?.body?.message || e?.message || 'Could not load trigger source',
-                                    variant: 'warning'
-                                }));
+                                console.error('Failed to load trigger source:', e);
                             }
+                        } else {
+                            // On failure, add a message to inform user they can close when ready
+                            this.deploymentCloseMessage = 'You can close this window when you\'re ready after reviewing the errors.';
                         }
                     } else if (attempts >= maxAttempts) {
                         this.dispatchEvent(
                             new ShowToastEvent({
                                 title: 'Deployment Timed Out',
-                                message: 'Stopped polling after ~30s. Check status later.',
+                                message: 'Stopped polling after 60s. Check status later.',
                                 variant: 'warning'
                             })
                         );
                         this.canRetry = true;
+                        this.isDeploying = false;
                     }
                     this.clearPoll();
                 }
             } catch (e) {
-                this.message = e?.body?.message || e?.message || 'Status check failed';
-                this.dispatchEvent(
-                    new ShowToastEvent({
-                        title: 'Status Check Error',
-                        message: this.message,
-                        variant: 'error'
-                    })
-                );
-                this.canRetry = true;
-                this.clearPoll();
+                // Fall back to simple status if detailed status fails
+                try {
+                    const status = await getStatus({ asyncId });
+                    this.message = `Status: ${status.state}${status.message ? ' — ' + status.message : ''}`;
+                    if (status.done || attempts >= maxAttempts) {
+                        this.handleSimpleStatusComplete(status, attempts, maxAttempts);
+                        this.clearPoll();
+                    }
+                } catch (fallbackError) {
+                    this.message = fallbackError?.body?.message || fallbackError?.message || 'Status check failed';
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'Status Check Error',
+                            message: this.message,
+                            variant: 'error'
+                        })
+                    );
+                    this.canRetry = true;
+                    this.isDeploying = false;
+                    this.clearPoll();
+                }
             }
         }, intervalMs);
+    }
+    
+    handleSimpleStatusComplete(status, attempts, maxAttempts) {
+        if (status.done) {
+            const isSuccess = status.state === 'Completed';
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: isSuccess ? 'Trigger Deployed' : 'Deployment Failed',
+                    message: isSuccess ? 'Metadata API reported Completed.' : (status.message || 'See debug logs for details.'),
+                    variant: isSuccess ? 'success' : 'error'
+                })
+            );
+            this.canRetry = !isSuccess;
+            this.isDeploying = false;
+        } else if (attempts >= maxAttempts) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Deployment Timed Out',
+                    message: 'Stopped polling after 60s. Check status later.',
+                    variant: 'warning'
+                })
+            );
+            this.canRetry = true;
+            this.isDeploying = false;
+        }
     }
 
     clearPoll() {

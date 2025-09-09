@@ -54,9 +54,11 @@ DateBuddyHandler processes changes based on populated fields:
 
 ### Test Coverage Achievements
 - **DateBuddyHandler**: 96% coverage (up from 68%)
-- **DateBuddyDeployController**: 82% coverage (up from 59%)
+- **DateBuddyDeployController**: 90% coverage (up from 59%)
 - **DateStampTriggerDeployer**: 86% coverage (up from 51%)
 - **UpdateDateFieldAction**: 90% coverage (up from 45%)
+- **RemoteSiteHelperTest**: Added for metadata API support
+- **Overall DateBuddy Coverage**: Meeting 90% minimum requirement
 
 ### Test Stub Approach for CMDT Mocking
 - Added `@TestVisible private static testMappings` field to DateBuddyHandler
@@ -68,6 +70,8 @@ DateBuddyHandler processes changes based on populated fields:
 - Uses SFDX for deployment
 - Deploy components individually when debugging
 - All tests must pass before considering work complete
+- See Dependencies.md for complete dependency mapping
+- Metadata service components from apex-mdapi repository integrated
 
 ## 2GP Package Information
 ### Package Details
@@ -78,11 +82,14 @@ DateBuddyHandler processes changes based on populated fields:
 - **API Version**: 64.0
 
 ### Current Version
-- **Version Number**: 1.1.0-1
-- **Subscriber Package Version ID**: 04tWs000000aW1NIAU
-- **Installation URL**: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aW1NIAU
+- **Version Number**: 1.4.0
+- **Subscriber Package Version ID**: 04tWs000000aWuDIAU
+- **Installation URL**: https://login.salesforce.com/packaging/installPackage.apexp?p0=04tWs000000aWuDIAU
 
 ### Version History
+- **1.4.0** (04tWs000000aWuDIAU) - Added real-time deployment status tracking with error display and validation rule detection
+- **1.3.0** (04tWs000000aWMLIA2) - Added metadata service components, dependency mapping, and test improvements
+- **1.2.0-1** (04tWs000000aWKjIAM) - Enhanced UI with client-side processing and improved terminology
 - **1.1.0-1** (04tWs000000aW1NIAU) - Added MetadataServiceTest class for improved test coverage
 - **1.0.0-1** (04tWs000000aVzlIAE) - Initial release with core DateBuddy functionality
 
@@ -92,7 +99,7 @@ DateBuddyHandler processes changes based on populated fields:
 sf package version create --package DateBuddy --installation-key-bypass --wait 20 --skip-validation
 
 # Install package
-sf package install --package 04tWs000000aW1NIAU --target-org YOUR_ORG --wait 10
+sf package install --package 04tWs000000aWuDIAU --target-org YOUR_ORG --wait 10
 
 # List package versions
 sf package version list --package DateBuddy
