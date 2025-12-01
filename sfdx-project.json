@@ -12,7 +12,7 @@
   "name": "DateBuddy",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "64.0",
+  "sourceApiVersion": "65.0",
   "packageAliases": {
     "DateBuddy": "0HoWs0000001qqzKAA",
     "DateBuddy@1.0.0-1": "04tWs000000aVzlIAE",
